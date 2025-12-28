@@ -3897,3 +3897,20 @@ p {
     transform: none;
   }
 }
+
+
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+
+/* ปิดลูกตาของ Browser (Chrome/Safari บางเวอร์ชัน) */
+input[type="password"]::-webkit-contacts-auto-fill-button,
+input[type="password"]::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+  display: none !important;
+  pointer-events: none;
+  height: 0;
+  width: 0;
+  margin: 0;
+}

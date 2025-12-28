@@ -1,17 +1,22 @@
 import { useState } from 'react';
 import { Plus, Edit2, Trash2, X, Check, Sparkles } from 'lucide-react';
-import { useApp } from '../context/AppContext';
+import { useClassTypes } from '../hooks';
+import type { Tables } from '../types/database.types';
+
+type ClassType = Tables<'class_types'>;
 
 export function ClassTypesTab() {
-  const { classTypes, addClassType, updateClassType, deleteClassType } = useApp();
+  const { classTypes, loading, error, createClassType, updateClassType, deleteClassType } = useClassTypes();
   const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     level: 'All Levels',
-    defaultDuration: 60,
-    color: '#8CA899' // Default sage color
+    duration_minutes: 60,
+    color_code: '#8CA899', // Default sage color
+    default_price: 25.00
   });
 
   const resetForm = () => {
@@ -19,38 +24,57 @@ export function ClassTypesTab() {
       title: '',
       description: '',
       level: 'All Levels',
-      defaultDuration: 60,
-      color: '#8CA899'
+      duration_minutes: 60,
+      color_code: '#8CA899',
+      default_price: 25.00
     });
     setEditingId(null);
     setShowForm(false);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingId) {
-      updateClassType(editingId, formData);
-    } else {
-      addClassType(formData);
+    setSubmitting(true);
+
+    try {
+      if (editingId) {
+        const result = await updateClassType(editingId, formData);
+        if (result.error) {
+          alert(`Error updating class type: ${result.error.message}`);
+          return;
+        }
+      } else {
+        const result = await createClassType(formData);
+        if (result.error) {
+          alert(`Error creating class type: ${result.error.message}`);
+          return;
+        }
+      }
+      resetForm();
+    } finally {
+      setSubmitting(false);
     }
-    resetForm();
   };
 
-  const handleEdit = (classType: any) => {
+  const handleEdit = (classType: ClassType) => {
     setFormData({
       title: classType.title,
-      description: classType.description,
-      level: classType.level,
-      defaultDuration: classType.defaultDuration,
-      color: classType.color
+      description: classType.description || '',
+      level: classType.level || 'All Levels',
+      duration_minutes: classType.duration_minutes || 60,
+      color_code: classType.color_code || '#8CA899',
+      default_price: classType.default_price || 25.00
     });
     setEditingId(classType.id);
     setShowForm(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: number) => {
     if (confirm('Are you sure you want to delete this class type?')) {
-      deleteClassType(id);
+      const result = await deleteClassType(id);
+      if (result.error) {
+        alert(`Error deleting class type: ${result.error.message}`);
+      }
     }
   };
 
@@ -109,7 +133,7 @@ export function ClassTypesTab() {
               {/* Color Header */}
               <div
                 className="h-3"
-                style={{ backgroundColor: classType.color }}
+                style={{ backgroundColor: classType.color_code || '#8CA899' }}
               />
               
               <div className="p-6">
@@ -119,7 +143,7 @@ export function ClassTypesTab() {
                     <div className="flex items-center gap-2 text-sm">
                       <span className="text-[var(--color-stone)]">{classType.level}</span>
                       <span className="text-[var(--color-stone)]">•</span>
-                      <span className="text-[var(--color-stone)]">{classType.defaultDuration} mins</span>
+                      <span className="text-[var(--color-stone)]">{classType.duration_minutes} mins</span>
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -216,8 +240,8 @@ export function ClassTypesTab() {
                   </label>
                   <input
                     type="number"
-                    value={formData.defaultDuration}
-                    onChange={(e) => setFormData({ ...formData, defaultDuration: parseInt(e.target.value) })}
+                    value={formData.duration_minutes}
+                    onChange={(e) => setFormData({ ...formData, duration_minutes: parseInt(e.target.value) })}
                     className="w-full px-4 py-3 rounded-lg border border-[var(--color-sand)] focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent transition-all duration-300"
                     min="15"
                     step="15"
@@ -236,9 +260,9 @@ export function ClassTypesTab() {
                     <button
                       key={preset.value}
                       type="button"
-                      onClick={() => setFormData({ ...formData, color: preset.value })}
+                      onClick={() => setFormData({ ...formData, color_code: preset.value })}
                       className={`h-12 rounded-lg transition-all duration-300 ${
-                        formData.color === preset.value ? 'ring-2 ring-offset-2 ring-[var(--color-sage)]' : 'hover:scale-110'
+                        formData.color_code === preset.value ? 'ring-2 ring-offset-2 ring-[var(--color-sage)]' : 'hover:scale-110'
                       }`}
                       style={{ backgroundColor: preset.value }}
                       title={preset.name}
@@ -247,9 +271,25 @@ export function ClassTypesTab() {
                 </div>
                 <input
                   type="color"
-                  value={formData.color}
-                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                  value={formData.color_code}
+                  onChange={(e) => setFormData({ ...formData, color_code: e.target.value })}
                   className="w-full h-12 rounded-lg border border-[var(--color-sand)] cursor-pointer"
+                />
+              </div>
+
+              {/* Price */}
+              <div>
+                <label className="block text-sm text-[var(--color-stone)] mb-2">
+                  Default Price *
+                </label>
+                <input
+                  type="number"
+                  value={formData.default_price}
+                  onChange={(e) => setFormData({ ...formData, default_price: parseFloat(e.target.value) })}
+                  className="w-full px-4 py-3 rounded-lg border border-[var(--color-sand)] focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent transition-all duration-300"
+                  min="0"
+                  step="0.01"
+                  required
                 />
               </div>
 

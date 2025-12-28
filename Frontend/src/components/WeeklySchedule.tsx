@@ -1,7 +1,10 @@
 import { Calendar, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useState } from 'react';
-import { useApp } from '../context/AppContext';
+import { useState, useMemo, useEffect } from 'react';
+import { useClasses } from '../hooks';
 import { ClassDetailModal } from './ClassDetailModal';
+import type { Tables } from '../types/database.types';
+
+type DbClass = Tables<'classes'>;
 
 interface WeeklyScheduleProps {
   onNavigate: (page: string) => void;
@@ -13,11 +16,80 @@ const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Sat
 const calendarDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export function WeeklySchedule({ onNavigate }: WeeklyScheduleProps) {
-  const { classes } = useApp();
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentWeekStart, setCurrentWeekStart] = useState(getWeekStart(new Date()));
-  const [selectedClass, setSelectedClass] = useState<any>(null);
+  const [selectedClass, setSelectedClass] = useState<DbClass | null>(null);
+
+  // Calculate dynamic date range based on viewMode
+  const dateRange = useMemo(() => {
+    if (viewMode === 'week') {
+      // Week view: Monday to Sunday
+      const start = new Date(currentWeekStart);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(currentWeekStart);
+      end.setDate(end.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
+      return { startDate: start.toISOString(), endDate: end.toISOString() };
+    } else if (viewMode === 'month') {
+      // Month view: 1st to last day of the month
+      const year = selectedDate.getFullYear();
+      const month = selectedDate.getMonth();
+      const start = new Date(year, month, 1);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(year, month + 1, 0); // Last day of month
+      end.setHours(23, 59, 59, 999);
+      return { startDate: start.toISOString(), endDate: end.toISOString() };
+    } else {
+      // Day view: just the selected day
+      const start = new Date(selectedDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(selectedDate);
+      end.setHours(23, 59, 59, 999);
+      return { startDate: start.toISOString(), endDate: end.toISOString() };
+    }
+  }, [viewMode, selectedDate, currentWeekStart]);
+
+  // Use the new useClasses hook with dynamic date filtering
+  const { classes: dbClasses, loading, error, fetchClasses } = useClasses({
+    category: 'class',
+    autoFetch: false, // We'll manually trigger fetches
+  });
+
+  // Fetch classes when date range changes (using stable string dependencies)
+  useEffect(() => {
+    const startStr = dateRange.startDate;
+    const endStr = dateRange.endDate;
+    
+    // Pass date range directly to fetchClasses
+    fetchClasses();
+  }, [dateRange.startDate, dateRange.endDate]);
+
+  // Transform database classes to UI format with null-safe handling
+  const classes = useMemo(() => {
+    return dbClasses.map((cls) => ({
+      id: cls.id.toString(),
+      title: cls.title,
+      time: new Date(cls.starts_at).toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      }),
+      instructor: cls.instructor_name || 'Annie Bliss', // Use instructor_name from DB
+      level: cls.level || 'All Levels',
+      capacity: cls.capacity,
+      enrolled: cls.booked_count,
+      day: new Date(cls.starts_at).toLocaleDateString('en-US', { weekday: 'long' }),
+      duration: cls.ends_at 
+        ? `${Math.round((new Date(cls.ends_at).getTime() - new Date(cls.starts_at).getTime()) / 60000)} min`
+        : '60 min',
+      description: cls.description || 'A wonderful yoga class to enhance your practice.',
+      room: cls.location || 'Studio A',
+      category: cls.category || 'class',
+      // Store original DB class for detail modal
+      _dbClass: cls,
+    }));
+  }, [dbClasses]);
 
   // Helper function to get the start of the week (Monday)
   function getWeekStart(date: Date): Date {
@@ -77,6 +149,7 @@ export function WeeklySchedule({ onNavigate }: WeeklyScheduleProps) {
       newWeekStart.setDate(newWeekStart.getDate() - 7);
       setCurrentWeekStart(newWeekStart);
       setSelectedDate(newWeekStart);
+      // Refetch will happen automatically via useEffect in useClasses
     } else {
       const newDate = new Date(selectedDate);
       newDate.setMonth(newDate.getMonth() - 1);
@@ -94,6 +167,7 @@ export function WeeklySchedule({ onNavigate }: WeeklyScheduleProps) {
       newWeekStart.setDate(newWeekStart.getDate() + 7);
       setCurrentWeekStart(newWeekStart);
       setSelectedDate(newWeekStart);
+      // Refetch will happen automatically via useEffect in useClasses
     } else {
       const newDate = new Date(selectedDate);
       newDate.setMonth(newDate.getMonth() + 1);
@@ -111,7 +185,7 @@ export function WeeklySchedule({ onNavigate }: WeeklyScheduleProps) {
   const getFilteredClasses = () => {
     if (viewMode === 'day') {
       const dayName = getCurrentDayName(selectedDate);
-      return classes.filter(cls => cls.day === dayName);
+      return classes.filter((cls) => cls.day === dayName);
     } else if (viewMode === 'week') {
       return classes;
     } else {
@@ -122,9 +196,44 @@ export function WeeklySchedule({ onNavigate }: WeeklyScheduleProps) {
 
   const filteredClasses = getFilteredClasses();
 
+  // Loading and error states
+  if (loading) {
+    return (
+      <section className="py-20 px-6 bg-white">
+        <div className="max-w-6xl mx-auto text-center">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <Calendar size={28} className="text-[var(--color-clay)] animate-pulse" />
+            <h2 className="text-[var(--color-earth-dark)]">Loading Schedule...</h2>
+          </div>
+          <p className="text-[var(--color-stone)]">Fetching classes from the database</p>
+        </div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="py-20 px-6 bg-white">
+        <div className="max-w-6xl mx-auto text-center">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <Calendar size={28} className="text-red-500" />
+            <h2 className="text-[var(--color-earth-dark)]">Error Loading Schedule</h2>
+          </div>
+          <p className="text-red-600 mb-4">{error.message}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-2 bg-[var(--color-sage)] text-white rounded-lg hover:bg-[var(--color-clay)] transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </section>
+    );
+  }
+
   // Group classes by day for week/month view
   const groupedClasses = daysOfWeek.reduce((acc, day) => {
-    acc[day] = filteredClasses.filter(cls => cls.day === day);
+    acc[day] = filteredClasses.filter((cls) => cls.day === day);
     return acc;
   }, {} as Record<string, typeof classes>);
 
@@ -177,8 +286,15 @@ export function WeeklySchedule({ onNavigate }: WeeklyScheduleProps) {
 
   // Get classes for a specific date
   const getClassesForDate = (date: Date) => {
-    const dayName = calendarDays[date.getDay()];
-    return classes.filter(cls => cls.day === dayName);
+    return classes.filter((cls) => {
+      if (!cls._dbClass?.starts_at) return false;
+      const classDate = new Date(cls._dbClass.starts_at);
+      return (
+        classDate.getDate() === date.getDate() &&
+        classDate.getMonth() === date.getMonth() &&
+        classDate.getFullYear() === date.getFullYear()
+      );
+    });
   };
 
   // Check if a date is today
@@ -267,7 +383,7 @@ export function WeeklySchedule({ onNavigate }: WeeklyScheduleProps) {
                   filteredClasses.map((classItem) => (
                     <button
                       key={classItem.id}
-                      onClick={() => setSelectedClass(classItem)}
+                      onClick={() => setSelectedClass(classItem._dbClass)}
                       className="w-full grid grid-cols-1 md:grid-cols-5 gap-2 md:gap-4 p-6 hover:bg-white transition-colors duration-200 text-left"
                     >
                       <div className="flex items-center gap-2">
@@ -323,7 +439,7 @@ export function WeeklySchedule({ onNavigate }: WeeklyScheduleProps) {
                             dayClasses.map((classItem) => (
                               <button
                                 key={classItem.id}
-                                onClick={() => setSelectedClass(classItem)}
+                                onClick={() => setSelectedClass(classItem._dbClass)}
                                 className="w-full grid grid-cols-1 md:grid-cols-5 gap-2 md:gap-4 p-6 hover:bg-white transition-colors duration-200 text-left"
                               >
                                 <div className="flex items-center gap-2">
@@ -445,9 +561,31 @@ export function WeeklySchedule({ onNavigate }: WeeklyScheduleProps) {
       {/* Class Detail Modal */}
       {selectedClass && (
         <ClassDetailModal
-          classData={selectedClass}
+          classData={{
+            id: selectedClass.id.toString(),
+            title: selectedClass.title,
+            time: new Date(selectedClass.starts_at).toLocaleTimeString('en-US', { 
+              hour: 'numeric', 
+              minute: '2-digit',
+              hour12: true 
+            }),
+            instructor: selectedClass.instructor_name || 'Annie Bliss',
+            level: selectedClass.level || 'All Levels',
+            capacity: selectedClass.capacity,
+            enrolled: selectedClass.booked_count,
+            day: new Date(selectedClass.starts_at).toLocaleDateString('en-US', { weekday: 'long' }),
+            duration: selectedClass.ends_at 
+              ? `${Math.round((new Date(selectedClass.ends_at).getTime() - new Date(selectedClass.starts_at).getTime()) / 60000)} min`
+              : '60 min',
+            description: selectedClass.description || 'A wonderful yoga class to enhance your practice.',
+            room: selectedClass.location || 'Studio A',
+          }}
           onClose={() => setSelectedClass(null)}
           onNavigate={onNavigate}
+          onBookingSuccess={() => {
+            // Refresh class data after successful booking
+            fetchClasses();
+          }}
         />
       )}
     </>

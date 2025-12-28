@@ -1,5 +1,7 @@
 import { X, Clock, User, TrendingUp, MapPin, Users } from 'lucide-react';
-import { useApp } from '../context/AppContext';
+import { useState } from 'react';
+import { useAuth } from '../hooks/useAuth';
+import { useBookings } from '../hooks/useBookings';
 
 interface ClassDetailModalProps {
   classData: {
@@ -17,22 +19,75 @@ interface ClassDetailModalProps {
   };
   onClose: () => void;
   onNavigate: (page: string) => void;
+  onBookingSuccess?: () => void; // Callback to refresh class data
 }
 
-export function ClassDetailModal({ classData, onClose, onNavigate }: ClassDetailModalProps) {
-  const { isLoggedIn, bookClass } = useApp();
+export function ClassDetailModal({ classData, onClose, onNavigate, onBookingSuccess }: ClassDetailModalProps) {
+  const { user } = useAuth();
+  const { createBooking } = useBookings({ autoFetch: false });
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
+  const [bookingSuccess, setBookingSuccess] = useState(false);
 
-  const handleBooking = () => {
-    if (isLoggedIn) {
-      bookClass(classData.id);
-      alert(`Successfully booked ${classData.title}! Check your email for confirmation.`);
-      onClose();
+  const handleBooking = async () => {
+    if (!user) {
+      handleLoginRedirect();
+      return;
+    }
+
+    try {
+      setBookingLoading(true);
+      setBookingError(null);
+
+      console.log('Creating booking for class:', classData.id, 'user:', user.id);
+
+      // Create booking with drop-in kind (no package)
+      const result = await createBooking({
+        user_id: user.id,
+        class_id: parseInt(classData.id),
+        kind: 'drop_in',
+        status: 'booked',
+      });
+
+      console.log('Booking result:', result);
+
+      if (result.error) {
+        throw result.error;
+      }
+
+      // Show success state
+      setBookingSuccess(true);
+
+      // Call refresh callback if provided
+      if (onBookingSuccess) {
+        onBookingSuccess();
+      }
+
+      // Close modal after 2 seconds
+      setTimeout(() => {
+        onClose();
+      }, 2000);
+    } catch (err: any) {
+      console.error('Booking error:', err);
+      
+      // Handle specific error cases
+      if (err.message?.includes('full')) {
+        setBookingError('This class is fully booked. Please try another class or join the waitlist.');
+      } else if (err.message?.includes('credit')) {
+        setBookingError('You do not have enough credits. Please purchase a package first.');
+      } else if (err.message?.includes('already booked')) {
+        setBookingError('You have already booked this class.');
+      } else {
+        setBookingError(err.message || 'Failed to book class. Please try again.');
+      }
+    } finally {
+      setBookingLoading(false);
     }
   };
 
   const handleLoginRedirect = () => {
     onClose();
-    onNavigate('admin');
+    onNavigate('login');
   };
 
   const handleContactRedirect = () => {
@@ -132,19 +187,33 @@ export function ClassDetailModal({ classData, onClose, onNavigate }: ClassDetail
 
           {/* Booking Section */}
           <div className="border-t border-[var(--color-sand)] pt-6">
-            {isLoggedIn ? (
+            {/* Show error message if booking failed */}
+            {bookingError && (
+              <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                <p className="text-sm">{bookingError}</p>
+              </div>
+            )}
+
+            {/* Show success message */}
+            {bookingSuccess && (
+              <div className="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
+                <p className="text-sm">✅ Successfully booked {classData.title}! Check your email for confirmation.</p>
+              </div>
+            )}
+
+            {user ? (
               <button
                 onClick={handleBooking}
-                disabled={isFullyBooked}
+                disabled={isFullyBooked || bookingLoading || bookingSuccess}
                 className={`w-full py-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 ${
-                  isFullyBooked
+                  isFullyBooked || bookingLoading || bookingSuccess
                     ? 'bg-[var(--color-stone)] text-white cursor-not-allowed'
                     : 'bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white shadow-lg hover:shadow-xl hover:scale-105'
                 }`}
               >
                 <Clock size={20} />
                 <span className="text-lg">
-                  {isFullyBooked ? 'Class Full - Join Waitlist' : 'Book This Class'}
+                  {bookingLoading ? 'Booking...' : bookingSuccess ? 'Booked!' : isFullyBooked ? 'Class Full - Join Waitlist' : 'Book This Class'}
                 </span>
               </button>
             ) : (

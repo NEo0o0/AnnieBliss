@@ -1,6 +1,10 @@
 import { useState } from 'react';
-import { Mail, Lock, User, Phone, Eye, EyeOff, MessageCircle, Instagram, Facebook, CheckCircle, Home } from 'lucide-react';
+import { Mail, Lock, User, Phone, Eye, EyeOff, MessageCircle, Instagram, Facebook, Home } from 'lucide-react';
+import { useAuth } from '../hooks';
 import { supabase } from '../utils/supabase/client';
+import type { Tables } from '../types/database.types';
+
+type Profile = Tables<'profiles'>;
 
 interface LoginRegisterProps {
   onLoginSuccess: (userData: {
@@ -24,11 +28,11 @@ type ContactPlatform = 'line' | 'instagram' | 'facebook' | 'whatsapp';
 export function LoginRegister({ onLoginSuccess, onNavigateHome }: LoginRegisterProps) {
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
   const [showPassword, setShowPassword] = useState(false);
-  
+
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  
+
   // Register form state
   const [registerName, setRegisterName] = useState('');
   const [registerEmail, setRegisterEmail] = useState('');
@@ -37,20 +41,20 @@ export function LoginRegister({ onLoginSuccess, onNavigateHome }: LoginRegisterP
   const [contactHandle, setContactHandle] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState('');
-  
+
   // Error and success states
   const [loginError, setLoginError] = useState('');
   const [registerError, setRegisterError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const { signIn, signUp, loading: authLoading, error: authError } = useAuth();
   const [verificationSent, setVerificationSent] = useState(false);
 
   // Helper function to format contact info into clickable URL
   const formatContactUrl = (platform: ContactPlatform, handle: string): string => {
     if (!handle) return '';
-    
+
     // Remove @ or other special characters
     const cleanHandle = handle.replace(/^@/, '').trim();
-    
+
     switch (platform) {
       case 'line':
         return `https://line.me/ti/p/~${cleanHandle}`;
@@ -67,88 +71,181 @@ export function LoginRegister({ onLoginSuccess, onNavigateHome }: LoginRegisterP
     }
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
-    setIsLoading(true);
 
-    // Simulate API delay
-    setTimeout(() => {
-      // Find user
-      const user = mockUsers.find(
-        u => u.email === loginEmail && u.password === loginPassword
-      );
+    try {
+      const { data, error } = await signIn(loginEmail, loginPassword);
+      
+      // Debug logging to see exact Supabase response
+      console.log('Login Result:', { data, error });
 
-      if (!user) {
-        setLoginError('Invalid email or password');
-        setIsLoading(false);
+      if (error) {
+        console.error('Login error from Supabase:', error);
+        setLoginError(error.message || 'Invalid email or password');
         return;
       }
 
-      // Successful login
-      onLoginSuccess(user);
-      setIsLoading(false);
-    }, 500);
+      // Check for session existence (critical for successful auth)
+      if (!data?.session) {
+        console.error('No session returned from login');
+        setLoginError('Login failed: No session created. Please try again.');
+        return;
+      }
+
+      console.log('Login successful! Session:', data.session);
+      console.log('User:', data.user);
+
+      // Fetch profile if not already included
+      let profile = data.profile;
+      if (!profile && data.user) {
+        console.log('Fetching profile for user:', data.user.id);
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+        profile = profileData;
+      }
+
+      if (data.user && profile) {
+        // Map Supabase profile to expected format
+        const userData = {
+          id: data.user.id,
+          name: profile.full_name || 'User',
+          email: data.user.email || loginEmail,
+          role: (profile.role || 'member') as 'member' | 'admin',
+          phone: profile.phone || undefined,
+          contactInfo: profile.contact_info || undefined,
+          contactPlatform: profile.contact_platform || undefined,
+        };
+
+        console.log('Calling onLoginSuccess with:', userData);
+        onLoginSuccess(userData);
+        
+        // Force hard redirect to homepage (full page reload)
+        console.log('Redirecting to homepage...');
+        window.location.href = '/';
+      } else {
+        console.error('Missing user or profile data');
+        setLoginError('Login succeeded but profile data is missing. Please contact support.');
+      }
+    } catch (err) {
+      console.error('Unexpected login error:', err);
+      setLoginError('An unexpected error occurred. Please try again.');
+    }
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegisterError('');
-    setIsLoading(true);
 
-    // Validation
-    if (!registerName || !registerEmail || !registerPhone || !registerPassword) {
+    // Validation - contact handle is now required for DB constraint
+    if (!registerName || !registerEmail || !registerPhone || !registerPassword || !contactHandle) {
       setRegisterError('Please fill in all required fields');
-      setIsLoading(false);
       return;
     }
 
     if (registerPassword !== registerConfirmPassword) {
       setRegisterError('Passwords do not match');
-      setIsLoading(false);
       return;
     }
 
     if (registerPassword.length < 6) {
       setRegisterError('Password must be at least 6 characters');
-      setIsLoading(false);
       return;
     }
 
-    // Check if email already exists
-    const existingUser = mockUsers.find(u => u.email === registerEmail);
-    if (existingUser) {
-      setRegisterError('Email already registered. Please login instead.');
-      setIsLoading(false);
-      return;
-    }
-
-    // Format contact info into clickable URL
+    // Format contact info into clickable URL (required for DB constraint)
     const contactUrl = formatContactUrl(contactPlatform, contactHandle);
+    
+    if (!contactUrl) {
+      setRegisterError('Please provide valid contact information');
+      return;
+    }
 
-    // Simulate sending verification email
-    setTimeout(() => {
+    try {
+      const { data, error } = await signUp({
+        email: registerEmail,
+        password: registerPassword,
+        fullName: registerName,
+        phone: registerPhone,
+        contactInfo: contactUrl,
+        contactPlatform: contactPlatform,
+      });
+
+      // Debug logging to see exact Supabase response
+      console.log('Registration Result:', { data, error });
+
+      if (error) {
+        console.error('Registration error from Supabase:', error);
+        setRegisterError(error.message || 'Registration failed. Please try again.');
+        return;
+      }
+
+      // Handle "silent failure" - Supabase returns success but no session
+      // This happens when email already exists or email confirmation is required
+      if (!data?.session && !error) {
+        console.warn('Registration returned no session - email might exist or confirmation required');
+        setVerificationSent(true);
+        setRegisterError('Email might be already registered or confirmation is required. Please check your email.');
+        return;
+      }
+
+      // Show verification message
       setVerificationSent(true);
-      setIsLoading(false);
+      console.log('Registration successful! Session:', data.session);
+      console.log('User:', data.user);
 
-      // Simulate auto-login after 3 seconds (in real app, user would verify email first)
-      setTimeout(() => {
-        // Create new user
-        const newUser = {
-          id: `user_${Date.now()}`,
-          name: registerName,
-          email: registerEmail,
-          phone: registerPhone,
-          contactInfo: contactUrl, // Store as full URL
-          contactPlatform: contactPlatform,
-          role: 'member' as const,
-          packageType: 'Drop-in' // Default package
-        };
+      // If user is created and auto-confirmed (has session)
+      if (data?.session && data?.user) {
+        console.log('User auto-confirmed, proceeding with auto-login');
+        
+        // Fetch profile if not already included
+        let profile = data.profile;
+        if (!profile) {
+          console.log('Fetching profile for new user:', data.user.id);
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', data.user.id)
+            .single();
+          profile = profileData;
+        }
 
-        // Auto-login (in real app, this would happen after email verification)
-        onLoginSuccess(newUser);
-      }, 3000);
-    }, 1000);
+        if (profile) {
+          // Auto-login after successful registration
+          setTimeout(() => {
+            const userData = {
+              id: data.user.id,
+              name: profile.full_name || registerName,
+              email: data.user.email || registerEmail,
+              role: (profile.role || 'member') as 'member' | 'admin',
+              phone: profile.phone || registerPhone,
+              contactInfo: profile.contact_info || contactUrl,
+              contactPlatform: profile.contact_platform || contactPlatform,
+            };
+
+            console.log('Calling onLoginSuccess with:', userData);
+            onLoginSuccess(userData);
+            
+            // Force hard redirect to homepage (full page reload)
+            console.log('Redirecting to homepage...');
+            window.location.href = '/';
+          }, 2000);
+        } else {
+          console.error('Profile not found for new user');
+          setRegisterError('Registration succeeded but profile creation failed. Please try logging in.');
+        }
+      } else {
+        console.log('Email confirmation required - user needs to verify email');
+        // Email confirmation required - don't redirect
+      }
+    } catch (err) {
+      console.error('Unexpected registration error:', err);
+      setRegisterError('An unexpected error occurred. Please try again.');
+    }
   };
 
   return (
@@ -254,15 +351,14 @@ export function LoginRegister({ onLoginSuccess, onNavigateHome }: LoginRegisterP
 
                 <button
                   type="submit"
-                  className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white py-3 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl"
+                  disabled={authLoading}
+                  className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white py-3 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Login
+                  {authLoading ? 'Logging in...' : 'Login'}
                 </button>
 
                 <div className="text-center text-sm text-[var(--color-stone)]">
-                  <p>Demo Credentials:</p>
-                  <p className="mt-1">Member: sarah@email.com / member123</p>
-                  <p>Admin: admin@anniebliss.com / admin123</p>
+                  <p>New user? Create an account to get started!</p>
                 </div>
               </form>
             )}
@@ -332,7 +428,7 @@ export function LoginRegister({ onLoginSuccess, onNavigateHome }: LoginRegisterP
 
                 <div>
                   <label className="block text-sm text-[var(--color-stone)] mb-2">
-                    Contact Platform (Optional)
+                    Contact Platform *
                   </label>
                   <div className="relative">
                     <MessageCircle
@@ -343,6 +439,7 @@ export function LoginRegister({ onLoginSuccess, onNavigateHome }: LoginRegisterP
                       value={contactPlatform}
                       onChange={(e) => setContactPlatform(e.target.value as ContactPlatform)}
                       className="w-full pl-12 pr-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent"
+                      required
                     >
                       <option value="line">Line</option>
                       <option value="instagram">Instagram</option>
@@ -354,7 +451,7 @@ export function LoginRegister({ onLoginSuccess, onNavigateHome }: LoginRegisterP
 
                 <div>
                   <label className="block text-sm text-[var(--color-stone)] mb-2">
-                    Contact Handle (Optional)
+                    Contact Handle *
                   </label>
                   <div className="relative">
                     {contactPlatform === 'line' && (
@@ -381,10 +478,11 @@ export function LoginRegister({ onLoginSuccess, onNavigateHome }: LoginRegisterP
                       onChange={(e) => setContactHandle(e.target.value)}
                       className="w-full pl-12 pr-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent"
                       placeholder={contactPlatform === 'line' ? '@yourlineID' : 'your handle'}
+                      required
                     />
                   </div>
                   <p className="text-xs text-[var(--color-stone)] mt-1">
-                    Preferred contact method for class updates
+                    Required: We'll use this to contact you about class updates
                   </p>
                 </div>
 
@@ -443,14 +541,15 @@ export function LoginRegister({ onLoginSuccess, onNavigateHome }: LoginRegisterP
 
                 {verificationSent ? (
                   <div className="bg-green-50 text-green-600 px-4 py-3 rounded-lg text-sm">
-                    Verification email sent. Please check your inbox.
+                    ✓ Account created successfully! Logging you in...
                   </div>
                 ) : (
                   <button
                     type="submit"
-                    className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white py-3 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl"
+                    disabled={authLoading}
+                    className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white py-3 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Create Account
+                    {authLoading ? 'Creating Account...' : 'Create Account'}
                   </button>
                 )}
 
@@ -476,29 +575,3 @@ export function LoginRegister({ onLoginSuccess, onNavigateHome }: LoginRegisterP
     </div>
   );
 }
-
-// Mock users for demonstration purposes
-const mockUsers = [
-  {
-    id: 'user_1',
-    name: 'Sarah Johnson',
-    email: 'sarah@email.com',
-    password: 'member123',
-    phone: '+66 81 234 5678',
-    contactInfo: 'https://line.me/ti/p/~sarahline',
-    contactPlatform: 'line',
-    role: 'member' as const,
-    packageType: 'Drop-in' // Default package
-  },
-  {
-    id: 'user_2',
-    name: 'Admin User',
-    email: 'admin@anniebliss.com',
-    password: 'admin123',
-    phone: '+66 81 234 5678',
-    contactInfo: 'https://instagram.com/adminuser',
-    contactPlatform: 'instagram',
-    role: 'admin' as const,
-    packageType: 'Drop-in' // Default package
-  }
-];

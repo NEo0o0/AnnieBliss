@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 
+// UI-friendly interfaces for mock data (not using strict DB types yet)
 interface ClassType {
   id: string;
   title: string;
@@ -18,6 +19,7 @@ interface WeeklySlot {
   room: string;
 }
 
+// UI-friendly class interface for mock data
 interface Class {
   id: string;
   title: string;
@@ -320,11 +322,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...classData,
       id: Date.now().toString(),
     };
-    setClasses(prev => [...prev, newClass]);
+    setClasses((prev) => [...prev, newClass]);
   };
 
   const bookClass = (classId: string) => {
-    setClasses(prev => prev.map(cls => {
+    setClasses((prev) => prev.map((cls) => {
       if (cls.id === classId && cls.enrolled < cls.capacity) {
         return { ...cls, enrolled: cls.enrolled + 1 };
       }
@@ -337,11 +339,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...classType,
       id: Date.now().toString(),
     };
-    setClassTypes(prev => [...prev, newClassType]);
+    setClassTypes((prev) => [...prev, newClassType]);
   };
 
   const updateClassType = (id: string, classType: Partial<ClassType>) => {
-    setClassTypes(prev => prev.map(ct => {
+    setClassTypes((prev) => prev.map((ct) => {
       if (ct.id === id) {
         return { ...ct, ...classType };
       }
@@ -350,7 +352,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteClassType = (id: string) => {
-    setClassTypes(prev => prev.filter(ct => ct.id !== id));
+    setClassTypes((prev) => prev.filter((ct) => ct.id !== id));
   };
 
   const addWeeklySlot = (slot: Omit<WeeklySlot, 'id'>) => {
@@ -358,11 +360,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...slot,
       id: Date.now().toString(),
     };
-    setWeeklySlots(prev => [...prev, newSlot]);
+    setWeeklySlots((prev) => [...prev, newSlot]);
   };
 
   const updateWeeklySlot = (id: string, slot: Partial<WeeklySlot>) => {
-    setWeeklySlots(prev => prev.map(ws => {
+    setWeeklySlots((prev) => prev.map((ws) => {
       if (ws.id === id) {
         return { ...ws, ...slot };
       }
@@ -371,7 +373,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteWeeklySlot = (id: string) => {
-    setWeeklySlots(prev => prev.filter(ws => ws.id !== id));
+    setWeeklySlots((prev) => prev.filter((ws) => ws.id !== id));
   };
 
   const generateMonthlySchedule = (year: number, month: number) => {

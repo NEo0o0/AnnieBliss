@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Hero } from './components/Hero';
 import { WhyAnnieBliss } from './components/WhyAnnieBliss';
 import { StudioPreview } from './components/StudioPreview';
@@ -26,6 +26,7 @@ import { MemberDashboard } from './components/MemberDashboard';
 import { Pricing } from './components/Pricing';
 import { Navbar } from './components/Navbar';
 import { AppProvider } from './context/AppContext';
+import { supabase } from './utils/supabase/client';
 
 interface UserData {
   id: string;
@@ -44,6 +45,7 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState('home');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserData | null>(null);
+  const [authLoading, setAuthLoading] = useState(true); // Initialize as true to wait for session
 
   const handleNavigate = (page: string) => {
     // If trying to access admin without auth, redirect to login
@@ -72,7 +74,8 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     setCurrentUser(null);
     setIsAuthenticated(false);
     setCurrentPage('home');
@@ -85,6 +88,68 @@ export default function App() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
+
+  // Restore session on app load
+  useEffect(() => {
+    async function restoreSession() {
+      try {
+        console.log('Restoring session...');
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error restoring session:', error);
+          setAuthLoading(false);
+          return;
+        }
+
+        if (session?.user) {
+          console.log('Session found, fetching profile...');
+          // Fetch user profile
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+
+          if (profile) {
+            const userData: UserData = {
+              id: session.user.id,
+              name: profile.full_name || 'User',
+              email: session.user.email || '',
+              role: (profile.role || 'member') as 'member' | 'admin',
+              phone: profile.phone || undefined,
+              lineId: profile.contact_info || undefined,
+            };
+
+            console.log('Session restored with user:', userData);
+            setCurrentUser(userData);
+            setIsAuthenticated(true);
+            setCurrentPage('member'); // Redirect to dashboard
+          }
+        } else {
+          console.log('No session found');
+        }
+      } catch (err) {
+        console.error('Unexpected error restoring session:', err);
+      } finally {
+        setAuthLoading(false);
+      }
+    }
+
+    restoreSession();
+  }, []);
+
+  // Show loading spinner while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--color-cream)] via-white to-[var(--color-sand)]">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-sage)]"></div>
+          <p className="mt-4 text-[var(--color-stone)]">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Login page (no navbar/footer)
   if (currentPage === 'login') {
@@ -99,7 +164,13 @@ export default function App() {
   }
 
   // Member dashboard (no navbar/footer, separate layout)
-  if (currentPage === 'member' && isAuthenticated && currentUser) {
+  // Protected route: redirect to login if not authenticated
+  if (currentPage === 'member') {
+    if (!isAuthenticated || !currentUser) {
+      // Redirect to login if trying to access member area without auth
+      setCurrentPage('login');
+      return null;
+    }
     return (
       <AppProvider>
         <MemberDashboard 
@@ -114,7 +185,16 @@ export default function App() {
   }
 
   // Admin dashboard (no navbar/footer)
-  if (currentPage === 'admin' && isAuthenticated && currentUser?.role === 'admin') {
+  // Protected route: redirect if not authenticated or not admin
+  if (currentPage === 'admin') {
+    if (!isAuthenticated || !currentUser) {
+      setCurrentPage('login');
+      return null;
+    }
+    if (currentUser.role !== 'admin') {
+      setCurrentPage('member');
+      return null;
+    }
     return (
       <AppProvider>
         <AdminDashboard 
