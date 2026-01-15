@@ -1,10 +1,174 @@
-export function TeacherTrainingHero() {
+ "use client";
+
+import { useRouter } from 'next/navigation';
+import { useMemo, useState } from 'react';
+import { Calendar, DollarSign } from 'lucide-react';
+import { useTeacherTraining } from '../hooks/useTeacherTraining';
+import { useAuth } from '../hooks/useAuth';
+import { TrainingDetailModal } from './TrainingDetailModal';
+import type { Tables } from '../types/database.types';
+
+type Training = Tables<'classes'> & {
+  early_bird_price: number | null;
+  early_bird_deadline: string | null;
+  registration_opens_at: string | null;
+};
+
+type TrainingStatus = 'Coming Soon' | 'Early Bird' | 'Regular' | 'Closed';
+
+export function TeacherTrainingHero({ initialTrainings }: { initialTrainings?: Training[] }) {
+  const router = useRouter();
+  const { user } = useAuth();
+  const { trainings, loading } = useTeacherTraining({ initialTrainings });
+  const training = trainings[0] ?? null;
+  const [showDetail, setShowDetail] = useState(false);
+
+  const now = Date.now();
+
+  const registrationOpensAt = useMemo(() => {
+    const raw = training?.registration_opens_at;
+    return raw ? new Date(raw) : null;
+  }, [training]);
+
+  const earlyBirdDeadline = useMemo(() => {
+    const raw = training?.early_bird_deadline;
+    return raw ? new Date(raw) : null;
+  }, [training]);
+
+  const earlyBirdPrice = useMemo(() => {
+    const raw = training?.early_bird_price;
+    return raw ?? null;
+  }, [training]);
+
+  const trainingStartsAt = useMemo(() => {
+    if (!training?.starts_at) return null;
+    return new Date(training.starts_at);
+  }, [training?.starts_at]);
+
+  const status = useMemo<TrainingStatus>(() => {
+    if (!trainingStartsAt || !training) return 'Coming Soon';
+
+    const nowDate = new Date(now);
+
+    const isClosedByCapacity = training.booked_count >= training.capacity;
+    const isClosedByTime = nowDate >= trainingStartsAt;
+    if (isClosedByCapacity || isClosedByTime) return 'Closed';
+
+    if (registrationOpensAt && nowDate < registrationOpensAt) return 'Coming Soon';
+
+    if (earlyBirdDeadline && nowDate <= earlyBirdDeadline) return 'Early Bird';
+
+    return 'Regular';
+  }, [earlyBirdDeadline, now, registrationOpensAt, training, trainingStartsAt]);
+
+  const formattedDate = useMemo(() => {
+    if (!training?.starts_at) return '';
+    return new Date(training.starts_at).toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  }, [training?.starts_at]);
+
+  const formattedRegistrationOpensAt = useMemo(() => {
+    if (!registrationOpensAt) return '';
+    return registrationOpensAt.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  }, [registrationOpensAt]);
+
+  const formattedEarlyBirdDeadline = useMemo(() => {
+    if (!earlyBirdDeadline) return '';
+    return earlyBirdDeadline.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  }, [earlyBirdDeadline]);
+
+  const excerpt = useMemo(() => {
+    const text = training?.description ?? '';
+    if (text.length <= 160) return text;
+    return `${text.slice(0, 160).trim()}...`;
+  }, [training?.description]);
+
+  const regularPriceLabel = useMemo(() => {
+    const price = training?.price;
+    if (!price || price === 0) return 'Free';
+    return `฿${price.toLocaleString()}`;
+  }, [training?.price]);
+
+  const earlyBirdPriceLabel = useMemo(() => {
+    if (!earlyBirdPrice || earlyBirdPrice === 0) return 'Free';
+    return `฿${earlyBirdPrice.toLocaleString()}`;
+  }, [earlyBirdPrice]);
+
+  const earlyBirdSavingsLabel = useMemo(() => {
+    const regular = training?.price;
+    if (!regular || !earlyBirdPrice) return '';
+    const diff = regular - earlyBirdPrice;
+    if (diff <= 0) return '';
+    return `฿${diff.toLocaleString()}`;
+  }, [earlyBirdPrice, training?.price]);
+
+  const badgeLabel = useMemo(() => {
+    if (status === 'Early Bird') return '🔥 Early Bird';
+    if (status === 'Coming Soon') return 'Coming Soon';
+    if (status === 'Regular') return 'Enrolling Now';
+    return 'Closed';
+  }, [status]);
+
+  const cta = useMemo(() => {
+    if (!training || loading) {
+      return { disabled: true, text: 'Apply Now' };
+    }
+
+    if (status === 'Closed') {
+      return { disabled: true, text: 'Registration Closed' };
+    }
+
+    if (status === 'Coming Soon') {
+      if (formattedRegistrationOpensAt) {
+        return { disabled: true, text: `Opens on ${formattedRegistrationOpensAt}` };
+      }
+      return { disabled: true, text: 'Coming Soon' };
+    }
+
+    if (status === 'Early Bird') {
+      if (earlyBirdSavingsLabel) {
+        return { disabled: false, text: `Apply Now (Save ${earlyBirdSavingsLabel})` };
+      }
+      return { disabled: false, text: 'Apply Now (Early Bird)' };
+    }
+
+    return { disabled: false, text: 'Apply Now' };
+  }, [earlyBirdSavingsLabel, formattedRegistrationOpensAt, loading, status, training]);
+
+  const heroImage =
+    training?.cover_image_url ||
+    'https://images.unsplash.com/photo-1758797315487-b3b225dff7d8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx5b2dhJTIwdGVhY2hlciUyMHRyYWluaW5nJTIwZ3JvdXB8ZW58MXx8fHwxNzY2NDkxODU5fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral';
+
+  const handleApplyNow = () => {
+    if (!training) return;
+
+    if (cta.disabled) return;
+
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    setShowDetail(true);
+  };
+
   return (
     <section className="relative h-[80vh] overflow-hidden">
       {/* Background Image */}
       <div className="absolute inset-0">
         <img
-          src="https://images.unsplash.com/photo-1758797315487-b3b225dff7d8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx5b2dhJTIwdGVhY2hlciUyMHRyYWluaW5nJTIwZ3JvdXB8ZW58MXx8fHwxNzY2NDkxODU5fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+          src={heroImage}
           alt="Yoga teacher training group"
           className="w-full h-full object-cover"
         />
@@ -18,10 +182,57 @@ export function TeacherTrainingHero() {
           <div className="inline-block px-4 py-2 rounded-full bg-white/20 backdrop-blur-sm mb-6">
             <span className="text-sm tracking-wide uppercase">Transform Your Practice</span>
           </div>
-          <h1 className="mb-6 text-white">200-Hour Yoga Teacher Training</h1>
-          <p className="text-xl mb-8 max-w-2xl mx-auto leading-relaxed">
-            Embark on a transformative journey to deepen your practice and share the gift of yoga with others. Our comprehensive program blends ancient wisdom with modern teaching techniques.
-          </p>
+          <div className="flex items-center justify-center gap-3 mb-6">
+            <h1 className="text-white">{training?.title || 'Teacher Training'}</h1>
+            <span className="inline-block px-3 py-1 rounded-full text-xs bg-white/20 backdrop-blur-sm">
+              {badgeLabel}
+            </span>
+          </div>
+
+          {loading ? (
+            <p className="text-xl mb-8 max-w-2xl mx-auto leading-relaxed">Loading upcoming training...</p>
+          ) : (
+            <p className="text-xl mb-8 max-w-2xl mx-auto leading-relaxed">
+              {excerpt || 'Our next teacher training is coming soon. Check back for details.'}
+            </p>
+          )}
+
+          {training && (
+            <div className="flex flex-wrap items-center justify-center gap-6 mb-8 text-sm">
+              <div className="flex items-center gap-2">
+                <Calendar size={16} />
+                <span>{formattedDate}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <DollarSign size={16} />
+                {status === 'Early Bird' && earlyBirdPrice != null ? (
+                  <span>
+                    <span className="font-semibold">Early Bird: {earlyBirdPriceLabel}</span>{' '}
+                    <span className="opacity-80 line-through">{regularPriceLabel}</span>
+                  </span>
+                ) : status === 'Coming Soon' && earlyBirdPrice != null ? (
+                  <span>Starting from {earlyBirdPriceLabel}</span>
+                ) : (
+                  <span>{regularPriceLabel}</span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {status === 'Early Bird' && formattedEarlyBirdDeadline && (
+            <p className="text-sm mb-6 opacity-95">Early Bird ends on {formattedEarlyBirdDeadline}!</p>
+          )}
+
+          <div className="flex items-center justify-center">
+            <button
+              onClick={handleApplyNow}
+              disabled={cta.disabled}
+              className="bg-[var(--color-sage)] hover:bg-[var(--color-clay)] disabled:opacity-60 disabled:cursor-not-allowed text-white px-10 py-4 rounded-lg text-lg transition-all duration-300 shadow-lg hover:shadow-2xl"
+            >
+              {cta.text}
+            </button>
+          </div>
+
           <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-white" />
@@ -45,6 +256,13 @@ export function TeacherTrainingHero() {
           <div className="w-1.5 h-1.5 rounded-full bg-white/60" />
         </div>
       </div>
+
+      {showDetail && training && (
+        <TrainingDetailModal
+          training={training as Training}
+          onClose={() => setShowDetail(false)}
+        />
+      )}
     </section>
   );
 }

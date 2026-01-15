@@ -1,3 +1,5 @@
+'use client';
+
 import {
   Calendar,
   Mail,
@@ -7,11 +9,19 @@ import {
   Sparkles,
   GraduationCap,
   Package,
+  User,
   ChevronDown,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useRouter } from 'next/navigation';
 import { Logo } from "./Logo";
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/utils/supabase/client';
 
+/**
+ * Client Component: This component uses React hooks and window scroll listeners.
+ * It should only be rendered on the client-side.
+ */
 interface NavbarProps {
   currentPage: string;
   onNavigate: (page: string) => void;
@@ -21,6 +31,10 @@ export function Navbar({
   currentPage,
   onNavigate,
 }: NavbarProps) {
+  const router = useRouter();
+  const { user, profile, loading: authLoading } = useAuth();
+  const role = (profile?.role ?? 'member') as 'admin' | 'instructor' | 'member';
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [workshopsDropdownOpen, setWorkshopsDropdownOpen] =
     useState(false);
@@ -40,6 +54,10 @@ export function Navbar({
     return () =>
       window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  useEffect(() => {
+    console.log('Navbar Profile Data:', profile);
+  }, [profile]);
 
   const navLinks = [
     { id: "schedule", label: "Schedule", icon: Calendar },
@@ -69,6 +87,14 @@ export function Navbar({
   const handleLogoClick = () => {
     onNavigate("home");
     setMobileMenuOpen(false);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      window.location.href = '/';
+    }
   };
 
   return (
@@ -176,14 +202,39 @@ export function Navbar({
               )}
             </div>
 
-            {/* Login Button - Primary Action */}
-            <button
-              onClick={() => handleNavClick("login")}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-gradient-to-r from-[var(--color-sage)] to-[var(--color-clay)] text-white hover:opacity-90 transition-all duration-300 shadow-md hover:shadow-lg font-medium"
-            >
-              <LogIn size={18} strokeWidth={2} />
-              <span>Login</span>
-            </button>
+            {/* Auth Button - Primary Action */}
+            {user ? (
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    router.push('/profile');
+                  }}
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-gradient-to-r from-[var(--color-sage)] to-[var(--color-clay)] text-white hover:opacity-90 transition-all duration-300 shadow-md hover:shadow-lg font-medium"
+                >
+                  <User size={18} strokeWidth={2} />
+                  <span>{authLoading ? 'Loading…' : role === 'admin' ? 'Dashboard' : 'Profile'}</span>
+                  {role === 'admin' ? (
+                    <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] bg-white/20 border border-white/30">
+                      Admin
+                    </span>
+                  ) : null}
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="px-4 py-2.5 rounded-lg text-[var(--color-stone)] hover:text-[var(--color-earth-dark)] hover:bg-[var(--color-cream)] transition-all duration-300"
+                >
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => handleNavClick("login")}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-gradient-to-r from-[var(--color-sage)] to-[var(--color-clay)] text-white hover:opacity-90 transition-all duration-300 shadow-md hover:shadow-lg font-medium"
+              >
+                <LogIn size={18} strokeWidth={2} />
+                <span>Login</span>
+              </button>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -261,14 +312,40 @@ export function Navbar({
                 })}
               </div>
 
-              {/* Login Button - Mobile */}
-              <button
-                onClick={() => handleNavClick("login")}
-                className="w-full flex items-center justify-center gap-3 px-4 py-4 rounded-xl bg-gradient-to-r from-[var(--color-sage)] to-[var(--color-clay)] text-white hover:opacity-90 transition-all duration-300 shadow-lg font-medium mt-4"
-              >
-                <LogIn size={20} strokeWidth={2} />
-                <span>Login</span>
-              </button>
+              {/* Auth Button - Mobile */}
+              {user ? (
+                <button
+                  onClick={() => {
+                    router.push('/profile');
+                  }}
+                  className="w-full flex items-center justify-center gap-3 px-4 py-4 rounded-xl bg-gradient-to-r from-[var(--color-sage)] to-[var(--color-clay)] text-white hover:opacity-90 transition-all duration-300 shadow-lg font-medium mt-4"
+                >
+                  <User size={20} strokeWidth={2} />
+                  <span>{authLoading ? 'Loading…' : role === 'admin' ? 'Dashboard' : 'Profile'}</span>
+                  {role === 'admin' ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-white/20 border border-white/30">
+                      Admin
+                    </span>
+                  ) : null}
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleNavClick("login")}
+                  className="w-full flex items-center justify-center gap-3 px-4 py-4 rounded-xl bg-gradient-to-r from-[var(--color-sage)] to-[var(--color-clay)] text-white hover:opacity-90 transition-all duration-300 shadow-lg font-medium mt-4"
+                >
+                  <LogIn size={20} strokeWidth={2} />
+                  <span>Login</span>
+                </button>
+              )}
+
+              {user ? (
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center justify-center gap-3 px-4 py-4 rounded-xl text-[var(--color-stone)] hover:text-[var(--color-earth-dark)] hover:bg-[var(--color-cream)] transition-all duration-300 font-medium"
+                >
+                  Logout
+                </button>
+              ) : null}
             </div>
           </div>
         )}

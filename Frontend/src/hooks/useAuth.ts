@@ -13,103 +13,150 @@ export interface AuthState {
   error: AuthError | null;
 }
 
-export function useAuth() {
-  const [authState, setAuthState] = useState<AuthState>({
-    user: null,
-    profile: null,
-    session: null,
-    loading: true,
-    error: null,
+let cachedAuthState: AuthState = {
+  user: null,
+  profile: null,
+  session: null,
+  loading: true,
+  error: null,
+};
+
+let authInitialized = false;
+let authSubscription: { unsubscribe: () => void } | null = null;
+const authListeners = new Set<(state: AuthState) => void>();
+
+function emitAuthState(next: AuthState) {
+  cachedAuthState = next;
+  authListeners.forEach((listener) => listener(next));
+}
+
+async function fetchProfile(userId: string): Promise<Profile | null> {
+  if (!userId) {
+    console.warn('No User ID to fetch profile');
+    return null;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      if ((error as any).code === 'PGRST116') {
+        console.warn('Profile not found, returning null/default user.');
+        return null;
+      }
+      throw error;
+    }
+    return data;
+  } catch (error) {
+    console.error('CRITICAL PROFILE ERROR:', error);
+    console.log('Attempted User ID:', userId);
+    return null;
+  }
+}
+
+async function initAuthOnce() {
+  if (authInitialized) return;
+  authInitialized = true;
+
+  try {
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
+
+    if (error) throw error;
+
+    if (session?.user) {
+      const profile = await fetchProfile(session.user.id);
+      emitAuthState({
+        user: session.user,
+        profile,
+        session,
+        loading: false,
+        error: null,
+      });
+    } else {
+      emitAuthState({
+        user: null,
+        profile: null,
+        session: null,
+        loading: false,
+        error: null,
+      });
+    }
+  } catch (error) {
+    emitAuthState({
+      user: null,
+      profile: null,
+      session: null,
+      loading: false,
+      error: error as AuthError,
+    });
+  }
+
+  const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_OUT' || !session?.user) {
+      emitAuthState({
+        user: null,
+        profile: null,
+        session: null,
+        loading: false,
+        error: null,
+      });
+      return;
+    }
+
+    emitAuthState({
+      ...cachedAuthState,
+      user: session.user,
+      session,
+      loading: true,
+      error: null,
+    });
+
+    const profile = await fetchProfile(session.user.id);
+    emitAuthState({
+      user: session.user,
+      profile,
+      session,
+      loading: false,
+      error: null,
+    });
   });
+
+  authSubscription = data.subscription;
+}
+
+export function useAuth() {
+  const [authState, setAuthState] = useState<AuthState>(cachedAuthState);
 
   useEffect(() => {
     let mounted = true;
 
-    async function getInitialSession() {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) throw error;
+    authListeners.add((next) => {
+      if (mounted) setAuthState(next);
+    });
 
-        if (mounted) {
-          if (session?.user) {
-            const profile = await fetchProfile(session.user.id);
-            setAuthState({
-              user: session.user,
-              profile,
-              session,
-              loading: false,
-              error: null,
-            });
-          } else {
-            setAuthState({
-              user: null,
-              profile: null,
-              session: null,
-              loading: false,
-              error: null,
-            });
-          }
-        }
-      } catch (error) {
-        if (mounted) {
-          setAuthState({
-            user: null,
-            profile: null,
-            session: null,
-            loading: false,
-            error: error as AuthError,
-          });
-        }
-      }
-    }
-
-    getInitialSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (mounted) {
-          if (session?.user) {
-            const profile = await fetchProfile(session.user.id);
-            setAuthState({
-              user: session.user,
-              profile,
-              session,
-              loading: false,
-              error: null,
-            });
-          } else {
-            setAuthState({
-              user: null,
-              profile: null,
-              session: null,
-              loading: false,
-              error: null,
-            });
-          }
-        }
-      }
-    );
+    void initAuthOnce();
 
     return () => {
       mounted = false;
-      subscription.unsubscribe();
+      authListeners.delete(setAuthState);
     };
   }, []);
 
-  async function fetchProfile(userId: string): Promise<Profile | null> {
+  async function checkIsAdmin(): Promise<boolean> {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
+      const { data, error } = await supabase.rpc('is_admin');
       if (error) throw error;
-      return data;
+      return data || false;
     } catch (error) {
-      console.error('Error fetching profile:', error);
-      return null;
+      console.error('Error checking admin status:', error);
+      return false;
     }
   }
 
@@ -205,6 +252,7 @@ export function useAuth() {
     signIn,
     signOut,
     updateProfile,
+    checkIsAdmin,
     isAuthenticated: !!authState.user,
     isAdmin: authState.profile?.role === 'admin',
     isInstructor: authState.profile?.role === 'instructor',

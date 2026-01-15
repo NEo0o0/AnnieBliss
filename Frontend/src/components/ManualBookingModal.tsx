@@ -1,6 +1,8 @@
+"use client";
+
 import { useState, useEffect } from 'react';
 import { X, Search, UserPlus, Users, Loader2, DollarSign, CreditCard, CheckCircle } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 interface Member {
   id: string;
@@ -97,7 +99,7 @@ export function ManualBookingModal({
         phone: selectedMember.phone,
         contactInfo: '',
         contactPlatform: '',
-        status: 'confirmed' as const,
+        status: 'booked' as const,
         bookingTime: new Date().toLocaleString('en-US', { 
           month: 'short', 
           day: 'numeric', 
@@ -146,7 +148,7 @@ export function ManualBookingModal({
         phone: guestForm.phone,
         contactInfo: guestForm.contact,
         contactPlatform: '',
-        status: 'confirmed' as const,
+        status: 'booked' as const,
         bookingTime: new Date().toLocaleString('en-US', { 
           month: 'short', 
           day: 'numeric', 

@@ -1,215 +1,234 @@
-import { useState, useMemo } from 'react';
-import { Search, MoreVertical, UserPlus, Calendar, Package, TrendingUp, Users as UsersIcon, X, MessageCircle, Instagram, Facebook, ExternalLink } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Search, Users as UsersIcon, MoreVertical, Shield, ShieldOff } from 'lucide-react';
+import { supabase } from '@/utils/supabase/client';
+import { MemberDetailsModal } from './MemberDetailsModal';
+import { AssignPackageModal } from './AssignPackageModal';
+import { EditProfileModal } from './EditProfileModal';
+import { ConfirmationModal } from './ConfirmationModal';
+import { toast } from 'sonner';
+
+type FilterType = 'all' | 'unlimited' | 'class-pack' | 'drop-in' | 'instructors';
+type SortField = 'fullName' | 'joinedDate' | 'packageStatus';
+type SortDirection = 'asc' | 'desc';
 
 interface Member {
   id: string;
   fullName: string;
-  email: string;
+  email?: string; // Optional - email is in auth.users, not profiles
   phone: string;
-  contactInfo?: string; // Full clickable URL
-  contactPlatform?: 'line' | 'instagram' | 'facebook' | 'whatsapp';
-  avatar?: string;
-  packageType: 'unlimited' | 'class-pack' | 'drop-in' | null;
+  role: string;
+  joinedDate: string;
   packageName: string;
+  packageType: string | null;
+  packageStatus: 'active' | 'expiring' | 'expired' | 'none';
   creditsLeft?: number;
   totalCredits?: number;
   expiryDate?: string;
-  status: 'active' | 'inactive';
-  joinedDate: string;
-  nationality?: string;
 }
 
-const mockMembers: Member[] = [
-  {
-    id: '1',
-    fullName: 'Sarah Thompson',
-    email: 'sarah.thompson@email.com',
-    phone: '+66 81 234 5678',
-    contactInfo: 'https://line.me/ti/p/@sarah_yoga',
-    contactPlatform: 'line',
-    packageType: 'unlimited',
-    packageName: 'Unlimited Monthly',
-    expiryDate: '2026-01-24',
-    status: 'active',
-    joinedDate: '2024-11-15',
-    nationality: 'American'
-  },
-  {
-    id: '2',
-    fullName: 'Michael Chen',
-    email: 'michael.chen@email.com',
-    phone: '+66 82 345 6789',
-    contactInfo: 'https://line.me/ti/p/@michael_chen',
-    contactPlatform: 'line',
-    packageType: 'class-pack',
-    packageName: '10-Class Pack',
-    creditsLeft: 7,
-    totalCredits: 10,
-    status: 'active',
-    joinedDate: '2024-12-01',
-    nationality: 'Chinese'
-  },
-  {
-    id: '3',
-    fullName: 'Emma Rodriguez',
-    email: 'emma.r@email.com',
-    phone: '+66 83 456 7890',
-    contactInfo: 'https://line.me/ti/p/@emma_rodriguez',
-    contactPlatform: 'line',
-    packageType: 'class-pack',
-    packageName: '20-Class Pack',
-    creditsLeft: 15,
-    totalCredits: 20,
-    status: 'active',
-    joinedDate: '2024-10-20',
-    nationality: 'Spanish'
-  },
-  {
-    id: '4',
-    fullName: 'David Kim',
-    email: 'david.kim@email.com',
-    phone: '+66 84 567 8901',
-    contactInfo: 'https://line.me/ti/p/@david_kim_yoga',
-    contactPlatform: 'line',
-    packageType: 'unlimited',
-    packageName: 'Unlimited Monthly',
-    expiryDate: '2026-01-10',
-    status: 'active',
-    joinedDate: '2024-09-05',
-    nationality: 'Korean'
-  },
-  {
-    id: '5',
-    fullName: 'Jessica Lee',
-    email: 'jessica.lee@email.com',
-    phone: '+66 85 678 9012',
-    contactInfo: 'https://line.me/ti/p/@jessica_lee',
-    contactPlatform: 'line',
-    packageType: 'drop-in',
-    packageName: 'Drop-in',
-    status: 'active',
-    joinedDate: '2024-12-15',
-    nationality: 'American'
-  },
-  {
-    id: '6',
-    fullName: 'Robert Martinez',
-    email: 'robert.m@email.com',
-    phone: '+66 86 789 0123',
-    contactInfo: 'https://line.me/ti/p/@robert_martinez',
-    contactPlatform: 'line',
-    packageType: 'class-pack',
-    packageName: '5-Class Pack',
-    creditsLeft: 2,
-    totalCredits: 5,
-    status: 'active',
-    joinedDate: '2024-12-10',
-    nationality: 'Spanish'
-  },
-  {
-    id: '7',
-    fullName: 'Amanda Wilson',
-    email: 'amanda.wilson@email.com',
-    phone: '+66 87 890 1234',
-    packageType: 'unlimited',
-    packageName: 'Unlimited Monthly',
-    expiryDate: '2025-12-15',
-    status: 'inactive',
-    joinedDate: '2024-08-12',
-    nationality: 'Australian'
-  },
-  {
-    id: '8',
-    fullName: 'Kevin Patel',
-    email: 'kevin.patel@email.com',
-    phone: '+66 88 901 2345',
-    contactInfo: 'https://line.me/ti/p/@kevin_patel',
-    contactPlatform: 'line',
-    packageType: 'class-pack',
-    packageName: '10-Class Pack',
-    creditsLeft: 0,
-    totalCredits: 10,
-    status: 'inactive',
-    joinedDate: '2024-11-01',
-    nationality: 'Indian'
-  },
-  {
-    id: '9',
-    fullName: 'Lisa Anderson',
-    email: 'lisa.anderson@email.com',
-    phone: '+66 89 012 3456',
-    contactInfo: 'https://line.me/ti/p/@lisa_anderson',
-    contactPlatform: 'line',
-    packageType: 'unlimited',
-    packageName: 'Unlimited Yearly',
-    expiryDate: '2026-06-30',
-    status: 'active',
-    joinedDate: '2024-07-15',
-    nationality: 'American'
-  },
-  {
-    id: '10',
-    fullName: 'James Taylor',
-    email: 'james.taylor@email.com',
-    phone: '+66 90 123 4567',
-    contactInfo: 'https://line.me/ti/p/@james_taylor',
-    contactPlatform: 'line',
-    packageType: 'drop-in',
-    packageName: 'Drop-in',
-    status: 'active',
-    joinedDate: '2024-12-20',
-    nationality: 'British'
-  }
-];
-
-type FilterType = 'all' | 'unlimited' | 'class-pack' | 'drop-in';
-type SortField = 'fullName' | 'joinedDate' | 'status';
-type SortDirection = 'asc' | 'desc';
-
 export function MembersManagement() {
-  const [members] = useState<Member[]>(mockMembers);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
-  const [sortField, setSortField] = useState<SortField>('joinedDate');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [sortField, setSortField] = useState<SortField>('fullName');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<string>('member');
 
-  // Filter and search members
-  const filteredMembers = useMemo(() => {
-    let result = [...members];
+  const [detailsModal, setDetailsModal] = useState<{ memberId: string; memberName: string; isInstructor: boolean } | null>(null);
+  const [assignPackageModal, setAssignPackageModal] = useState<{ memberId: string; memberName: string } | null>(null);
+  const [editProfileModal, setEditProfileModal] = useState<{ memberId: string; currentName: string; currentPhone: string } | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    variant?: 'default' | 'warning' | 'success';
+    confirmText: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: '',
+    onConfirm: () => {},
+  });
 
-    // Apply filter
-    if (activeFilter !== 'all') {
-      result = result.filter(member => member.packageType === activeFilter);
+  const fetchCurrentUserRole = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      if (profile) {
+        setCurrentUserRole(profile.role);
+      }
+    } catch (error) {
+      console.error('Error fetching user role:', error);
     }
+  }, []);
 
-    // Apply search
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(member =>
-        member.fullName.toLowerCase().includes(query) ||
-        member.phone.toLowerCase().includes(query) ||
-        member.email.toLowerCase().includes(query)
-      );
-    }
+  const fetchMembers = useCallback(async () => {
+    setLoading(true);
+    try {
+      // STEP 1: Fetch profiles only (simple query) - email is in auth.users, not profiles
+      console.log('Fetching profiles...');
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, phone, role, created_at')
+        .order('full_name');
 
-    // Apply sorting
-    result.sort((a, b) => {
-      let comparison = 0;
-
-      if (sortField === 'fullName') {
-        comparison = a.fullName.localeCompare(b.fullName);
-      } else if (sortField === 'joinedDate') {
-        comparison = new Date(a.joinedDate).getTime() - new Date(b.joinedDate).getTime();
-      } else if (sortField === 'status') {
-        comparison = a.status.localeCompare(b.status);
+      if (profilesError) {
+        console.error('Profiles fetch error:', profilesError);
+        throw profilesError;
       }
 
-      return sortDirection === 'asc' ? comparison : -comparison;
-    });
+      console.log('Profiles fetched:', profilesData?.length || 0);
 
-    return result;
-  }, [members, activeFilter, searchQuery, sortField, sortDirection]);
+      // STEP 2: Fetch user_packages separately (no join) - using any to bypass TypeScript
+      console.log('Fetching user packages...');
+      const { data: userPackagesData, error: packagesError } = await supabase
+        .from('user_packages')
+        .select('*') as any;
+
+      if (packagesError) {
+        console.error('User packages fetch error:', packagesError);
+        // Don't throw - continue without packages
+      }
+
+      console.log('User packages fetched:', userPackagesData?.length || 0);
+      if (userPackagesData && userPackagesData.length > 0) {
+        console.log('Sample user_package:', userPackagesData[0]);
+      }
+
+      // STEP 3: Fetch package details separately
+      let packagesDetailsMap: Record<number, any> = {};
+      if (userPackagesData && userPackagesData.length > 0) {
+        const packageIds = [...new Set((userPackagesData as any[]).map((up: any) => up.package_id).filter(Boolean))];
+        
+        if (packageIds.length > 0) {
+          console.log('Fetching package details for IDs:', packageIds);
+          const { data: packagesDetails, error: detailsError } = await supabase
+            .from('packages')
+            .select('*') as any;
+
+          if (detailsError) {
+            console.error('Package details fetch error:', detailsError);
+          } else {
+            console.log('Packages fetched:', packagesDetails?.length || 0);
+            if (packagesDetails && packagesDetails.length > 0) {
+              console.log('Sample package:', packagesDetails[0]);
+            }
+            packagesDetailsMap = (packagesDetails || []).reduce((acc: any, pkg: any) => {
+              acc[pkg.id] = pkg;
+              return acc;
+            }, {} as Record<number, any>);
+          }
+        }
+      }
+
+      // STEP 4: Client-side join and mapping
+      const membersWithPackages: Member[] = (profilesData || []).map((profile: any) => {
+        const activePackage = (userPackagesData || []).find((pkg: any) => pkg.user_id === profile.id);
+        const packageInfo = activePackage?.package_id ? packagesDetailsMap[activePackage.package_id] : null;
+
+        let packageStatus: 'active' | 'expiring' | 'expired' | 'none' = 'none';
+        let expiryDate: string | undefined;
+
+        if (activePackage && activePackage.expire_at) {
+          expiryDate = activePackage.expire_at;
+          const expiry = new Date(activePackage.expire_at);
+          const now = new Date();
+          const daysUntilExpiry = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+          // Check if package is still valid
+          const isUnlimited = packageInfo?.type === 'unlimited';
+          const hasCredits = activePackage.credits_remaining != null && activePackage.credits_remaining > 0;
+          const isNotExpired = expiry > now;
+          
+          // Package is active if: Not Expired AND (Is Unlimited OR Has Credits)
+          const isActive = isNotExpired && (isUnlimited || hasCredits);
+          
+          if (!isNotExpired) {
+            packageStatus = 'expired';
+          } else if (isActive) {
+            // Package is valid - check if expiring soon
+            if (daysUntilExpiry <= 7) {
+              packageStatus = 'expiring';
+            } else {
+              packageStatus = 'active';
+            }
+          } else {
+            // No credits left and not unlimited
+            packageStatus = 'expired';
+          }
+        }
+
+        return {
+          id: profile.id,
+          fullName: profile.full_name || 'Unknown',
+          email: undefined, // Email is in auth.users, not accessible from profiles table
+          phone: profile.phone || '',
+          role: (profile.role || 'member') as 'member' | 'instructor' | 'admin',
+          joinedDate: profile.created_at || new Date().toISOString(),
+          packageName: packageInfo?.name || 'No Package',
+          packageType: packageInfo?.type || null,
+          packageStatus,
+          creditsLeft: activePackage?.credits_remaining,
+          totalCredits: packageInfo?.credits,
+          expiryDate,
+        };
+      });
+
+      console.log('Members mapped:', membersWithPackages.length);
+      setMembers(membersWithPackages);
+      toast.success(`Loaded ${membersWithPackages.length} members`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      console.error('Error fetching members:', errorMessage, error);
+      toast.error(`Failed to load members: ${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCurrentUserRole();
+    fetchMembers();
+  }, [fetchCurrentUserRole, fetchMembers]);
+
+  const handleRoleChange = async (userId: string, userName: string, currentRole: string, newRole: string) => {
+    const isPromotion = newRole === 'instructor';
+    
+    setConfirmModal({
+      isOpen: true,
+      title: isPromotion ? 'Promote to Instructor' : 'Demote to Member',
+      message: `Are you sure you want to ${isPromotion ? 'promote' : 'demote'} ${userName} ${isPromotion ? 'to' : 'from'} instructor role?`,
+      variant: isPromotion ? 'success' : 'warning',
+      confirmText: isPromotion ? 'Promote' : 'Demote',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('profiles')
+            .update({ role: newRole })
+            .eq('id', userId);
+
+          if (error) throw error;
+
+          toast.success(`Successfully ${isPromotion ? 'promoted' : 'demoted'} ${userName}`);
+          fetchMembers();
+        } catch (error) {
+          console.error('Error updating role:', error);
+          toast.error('Failed to update role');
+        }
+      },
+    });
+  };
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -220,197 +239,131 @@ export function MembersManagement() {
     }
   };
 
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
+  const filteredMembers = useMemo(() => {
+    let filtered = members;
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
-
-  const getCreditsPercentage = (creditsLeft: number, totalCredits: number) => {
-    return (creditsLeft / totalCredits) * 100;
-  };
-
-  const getCreditsColor = (percentage: number) => {
-    if (percentage >= 50) return 'bg-green-500';
-    if (percentage >= 25) return 'bg-orange-500';
-    return 'bg-red-500';
-  };
-
-  const isExpired = (expiryDate: string) => {
-    return new Date(expiryDate) < new Date();
-  };
-
-  const getContactIcon = (platform?: 'line' | 'instagram' | 'facebook' | 'whatsapp') => {
-    switch (platform) {
-      case 'line':
-        return <MessageCircle size={16} className="text-green-600" />;
-      case 'instagram':
-        return <Instagram size={16} className="text-pink-600" />;
-      case 'facebook':
-        return <Facebook size={16} className="text-blue-600" />;
-      case 'whatsapp':
-        return <MessageCircle size={16} className="text-green-500" />;
-      default:
-        return null;
+    if (activeFilter === 'instructors') {
+      filtered = filtered.filter((m) => m.role === 'instructor' || m.role === 'admin');
+    } else if (activeFilter !== 'all') {
+      filtered = filtered.filter((m) => {
+        if (activeFilter === 'unlimited') return m.packageType === 'unlimited';
+        if (activeFilter === 'class-pack') return m.packageType === 'credit' || m.packageType === 'class-pack';
+        if (activeFilter === 'drop-in') return m.packageType === null || m.packageType === 'drop-in';
+        return true;
+      });
     }
-  };
 
-  const filterCounts = {
-    all: members.length,
-    unlimited: members.filter(m => m.packageType === 'unlimited').length,
-    'class-pack': members.filter(m => m.packageType === 'class-pack').length,
-    'drop-in': members.filter(m => m.packageType === 'drop-in').length,
-  };
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (m) =>
+          m.fullName.toLowerCase().includes(query) ||
+          (m.email && m.email.toLowerCase().includes(query)) ||
+          m.phone.toLowerCase().includes(query)
+      );
+    }
+
+    filtered.sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      if (sortField === 'fullName') {
+        aValue = a.fullName.toLowerCase();
+        bValue = b.fullName.toLowerCase();
+      } else if (sortField === 'joinedDate') {
+        aValue = new Date(a.joinedDate).getTime();
+        bValue = new Date(b.joinedDate).getTime();
+      } else if (sortField === 'packageStatus') {
+        const statusOrder = { active: 1, expiring: 2, expired: 3, none: 4 };
+        aValue = statusOrder[a.packageStatus];
+        bValue = statusOrder[b.packageStatus];
+      }
+
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return filtered;
+  }, [members, activeFilter, searchQuery, sortField, sortDirection]);
+
+  const filterCounts = useMemo(() => {
+    return {
+      all: members.length,
+      unlimited: members.filter((m) => m.packageType === 'unlimited').length,
+      'class-pack': members.filter((m) => m.packageType === 'credit' || m.packageType === 'class-pack').length,
+      'drop-in': members.filter((m) => m.packageType === null || m.packageType === 'drop-in').length,
+      instructors: members.filter((m) => m.role === 'instructor' || m.role === 'admin').length,
+    };
+  }, [members]);
+
+  const canManageRoles = currentUserRole === 'admin';
+  const canAssignPackages = currentUserRole === 'admin' || currentUserRole === 'instructor';
+  const canViewDetails = currentUserRole === 'admin' || currentUserRole === 'instructor';
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-[var(--color-stone)]">Loading members...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl text-[var(--color-earth-dark)] mb-2">Members</h1>
-            <p className="text-[var(--color-stone)]">Manage your yoga studio members and packages</p>
-          </div>
-          <button className="bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg">
-            <UserPlus size={20} />
-            <span>Add New Member</span>
-          </button>
-        </div>
-
-        {/* Search Bar */}
-        <div className="relative max-w-md">
-          <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--color-stone)]" />
-          <input
-            type="text"
-            placeholder="Search by name, phone, or email..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 rounded-lg border border-[var(--color-sand)] focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent transition-all duration-300"
-          />
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-light text-[var(--color-earth-dark)]">Members</h1>
+          <p className="text-[var(--color-stone)] mt-1">Manage studio members and their packages</p>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-lg p-6 shadow-md">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-[var(--color-stone)] mb-1">Total Members</p>
-              <p className="text-3xl text-[var(--color-earth-dark)]">{filterCounts.all}</p>
-            </div>
-            <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
-              <UsersIcon size={24} className="text-blue-600" />
-            </div>
+      <div className="bg-white rounded-xl shadow-sm border border-[var(--color-sand)] overflow-hidden">
+        <div className="p-6 border-b border-[var(--color-sand)]">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-stone)]" size={20} />
+            <input
+              type="text"
+              placeholder="Search by name, email, or phone..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent"
+            />
+          </div>
+
+          <div className="flex gap-2 mt-4 flex-wrap">
+            {(['all', 'unlimited', 'class-pack', 'drop-in', 'instructors'] as FilterType[]).map((filter) => (
+              <button
+                key={filter}
+                onClick={() => setActiveFilter(filter)}
+                className={`px-4 py-2 rounded-lg text-sm transition-all duration-300 ${
+                  activeFilter === filter
+                    ? 'bg-[var(--color-sage)] text-white shadow-md'
+                    : 'bg-[var(--color-cream)] text-[var(--color-stone)] hover:bg-[var(--color-sand)]'
+                }`}
+              >
+                {filter === 'all' && `All (${filterCounts.all})`}
+                {filter === 'unlimited' && `Unlimited (${filterCounts.unlimited})`}
+                {filter === 'class-pack' && `Class Pack (${filterCounts['class-pack']})`}
+                {filter === 'drop-in' && `Drop-in (${filterCounts['drop-in']})`}
+                {filter === 'instructors' && `Instructors (${filterCounts.instructors})`}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="bg-white rounded-lg p-6 shadow-md">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-[var(--color-stone)] mb-1">Unlimited</p>
-              <p className="text-3xl text-[var(--color-earth-dark)]">{filterCounts.unlimited}</p>
-            </div>
-            <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center">
-              <TrendingUp size={24} className="text-purple-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg p-6 shadow-md">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-[var(--color-stone)] mb-1">Class Packs</p>
-              <p className="text-3xl text-[var(--color-earth-dark)]">{filterCounts['class-pack']}</p>
-            </div>
-            <div className="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center">
-              <Package size={24} className="text-green-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg p-6 shadow-md">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-[var(--color-stone)] mb-1">Drop-ins</p>
-              <p className="text-3xl text-[var(--color-earth-dark)]">{filterCounts['drop-in']}</p>
-            </div>
-            <div className="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center">
-              <Calendar size={24} className="text-orange-600" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Filter Tabs */}
-      <div className="mb-6 border-b border-[var(--color-sand)]">
-        <div className="flex gap-4">
-          <button
-            onClick={() => setActiveFilter('all')}
-            className={`px-4 py-3 border-b-2 transition-all duration-300 ${
-              activeFilter === 'all'
-                ? 'border-[var(--color-sage)] text-[var(--color-sage)]'
-                : 'border-transparent text-[var(--color-stone)] hover:text-[var(--color-earth-dark)]'
-            }`}
-          >
-            All Members ({filterCounts.all})
-          </button>
-          <button
-            onClick={() => setActiveFilter('unlimited')}
-            className={`px-4 py-3 border-b-2 transition-all duration-300 ${
-              activeFilter === 'unlimited'
-                ? 'border-[var(--color-sage)] text-[var(--color-sage)]'
-                : 'border-transparent text-[var(--color-stone)] hover:text-[var(--color-earth-dark)]'
-            }`}
-          >
-            Unlimited Users ({filterCounts.unlimited})
-          </button>
-          <button
-            onClick={() => setActiveFilter('class-pack')}
-            className={`px-4 py-3 border-b-2 transition-all duration-300 ${
-              activeFilter === 'class-pack'
-                ? 'border-[var(--color-sage)] text-[var(--color-sage)]'
-                : 'border-transparent text-[var(--color-stone)] hover:text-[var(--color-earth-dark)]'
-            }`}
-          >
-            Class Pack Users ({filterCounts['class-pack']})
-          </button>
-          <button
-            onClick={() => setActiveFilter('drop-in')}
-            className={`px-4 py-3 border-b-2 transition-all duration-300 ${
-              activeFilter === 'drop-in'
-                ? 'border-[var(--color-sage)] text-[var(--color-sage)]'
-                : 'border-transparent text-[var(--color-stone)] hover:text-[var(--color-earth-dark)]'
-            }`}
-          >
-            Drop-in Users ({filterCounts['drop-in']})
-          </button>
-        </div>
-      </div>
-
-      {/* Members Table */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-full">
             <thead className="bg-[var(--color-cream)]">
               <tr>
-                <th 
+                <th
                   className="px-6 py-4 text-left text-xs uppercase tracking-wider text-[var(--color-stone)] cursor-pointer hover:bg-[var(--color-sand)] transition-colors"
                   onClick={() => handleSort('fullName')}
                 >
                   <div className="flex items-center gap-2">
                     Member
                     {sortField === 'fullName' && (
-                      <span className="text-[var(--color-sage)]">
-                        {sortDirection === 'asc' ? '↑' : '↓'}
-                      </span>
+                      <span className="text-[var(--color-sage)]">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                     )}
                   </div>
                 </th>
@@ -420,59 +373,46 @@ export function MembersManagement() {
                 <th className="px-6 py-4 text-left text-xs uppercase tracking-wider text-[var(--color-stone)]">
                   Status / Credits
                 </th>
-                <th 
+                <th
                   className="px-6 py-4 text-left text-xs uppercase tracking-wider text-[var(--color-stone)] cursor-pointer hover:bg-[var(--color-sand)] transition-colors"
-                  onClick={() => handleSort('status')}
+                  onClick={() => handleSort('packageStatus')}
                 >
                   <div className="flex items-center gap-2">
-                    Status
-                    {sortField === 'status' && (
-                      <span className="text-[var(--color-sage)]">
-                        {sortDirection === 'asc' ? '↑' : '↓'}
-                      </span>
+                    Package Status
+                    {sortField === 'packageStatus' && (
+                      <span className="text-[var(--color-sage)]">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                     )}
                   </div>
                 </th>
-                <th 
+                <th
                   className="px-6 py-4 text-left text-xs uppercase tracking-wider text-[var(--color-stone)] cursor-pointer hover:bg-[var(--color-sand)] transition-colors"
                   onClick={() => handleSort('joinedDate')}
                 >
                   <div className="flex items-center gap-2">
                     Joined Date
                     {sortField === 'joinedDate' && (
-                      <span className="text-[var(--color-sage)]">
-                        {sortDirection === 'asc' ? '↑' : '↓'}
-                      </span>
+                      <span className="text-[var(--color-sage)]">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                     )}
                   </div>
                 </th>
-                <th className="px-6 py-4 text-left text-xs uppercase tracking-wider text-[var(--color-stone)]">
-                  Actions
-                </th>
+                <th className="px-6 py-4 text-left text-xs uppercase tracking-wider text-[var(--color-stone)]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--color-sand)]">
               {filteredMembers.map((member) => (
                 <tr key={member.id} className="hover:bg-[var(--color-cream)]/50 transition-colors duration-150">
-                  {/* Member Info */}
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--color-sage)] to-[var(--color-clay)] flex items-center justify-center text-white text-sm">
-                        {getInitials(member.fullName)}
+                        {member.fullName.charAt(0).toUpperCase()}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-[var(--color-earth-dark)]">{member.fullName}</span>
-                          {member.contactInfo && member.contactPlatform && (
-                            <a
-                              href={member.contactInfo}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center justify-center w-6 h-6 rounded-full hover:bg-[var(--color-cream)] transition-all duration-200 group"
-                              title={`Contact on ${member.contactPlatform}`}
-                            >
-                              {getContactIcon(member.contactPlatform)}
-                            </a>
+                          {(member.role === 'instructor' || member.role === 'admin') && (
+                            <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">
+                              {member.role === 'admin' ? 'Admin' : 'Instructor'}
+                            </span>
                           )}
                         </div>
                         <div className="text-xs text-[var(--color-stone)]">{member.phone}</div>
@@ -481,54 +421,81 @@ export function MembersManagement() {
                     </div>
                   </td>
 
-                  {/* Current Package */}
                   <td className="px-6 py-4">
                     <div className="text-sm text-[var(--color-earth-dark)]">{member.packageName}</div>
                   </td>
 
-                  {/* Status / Credits */}
                   <td className="px-6 py-4">
                     {member.packageType === 'class-pack' && member.creditsLeft !== undefined && member.totalCredits !== undefined ? (
                       <div>
-                        <div className="text-sm text-[var(--color-earth-dark)] mb-1">
-                          {member.creditsLeft} of {member.totalCredits} credits left
+                        <div className={`text-sm font-medium mb-1 ${
+                          member.creditsLeft === 0 ? 'text-red-600' : 'text-[var(--color-earth-dark)]'
+                        }`}>
+                          {member.creditsLeft === 0 
+                            ? `Out of credits (0/${member.totalCredits})`
+                            : `${member.creditsLeft} / ${member.totalCredits}`
+                          }
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
-                            className={`h-2 rounded-full transition-all duration-300 ${getCreditsColor(getCreditsPercentage(member.creditsLeft, member.totalCredits))}`}
-                            style={{ width: `${getCreditsPercentage(member.creditsLeft, member.totalCredits)}%` }}
+                            className={`h-2 rounded-full transition-all duration-300 ${
+                              member.creditsLeft / member.totalCredits >= 0.5
+                                ? 'bg-green-500'
+                                : member.creditsLeft / member.totalCredits >= 0.25
+                                ? 'bg-orange-500'
+                                : 'bg-red-500'
+                            }`}
+                            style={{ width: `${(member.creditsLeft / member.totalCredits) * 100}%` }}
                           />
                         </div>
                       </div>
-                    ) : member.packageType === 'unlimited' && member.expiryDate ? (
-                      <div className="text-sm">
-                        <div className="text-[var(--color-stone)]">Expires on</div>
-                        <div className={`${isExpired(member.expiryDate) ? 'text-red-600' : 'text-[var(--color-earth-dark)]'}`}>
-                          {formatDate(member.expiryDate)}
-                        </div>
+                    ) : member.packageType === 'unlimited' ? (
+                      <div className="text-sm font-medium text-[var(--color-earth-dark)]">
+                        Unlimited
                       </div>
                     ) : (
                       <div className="text-sm text-[var(--color-stone)]">Pay per class</div>
                     )}
                   </td>
 
-                  {/* Status Badge */}
                   <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-xs ${
-                      member.status === 'active' 
-                        ? 'bg-green-100 text-green-700' 
-                        : 'bg-gray-100 text-gray-700'
-                    }`}>
-                      {member.status === 'active' ? 'Active' : 'Inactive'}
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs ${
+                        member.packageStatus === 'active'
+                          ? 'bg-green-100 text-green-700'
+                          : member.packageStatus === 'expiring'
+                          ? 'bg-orange-100 text-orange-700'
+                          : member.packageStatus === 'expired'
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      {member.packageStatus === 'active' ? (
+                        member.packageType === 'unlimited' ? (
+                          'Active'
+                        ) : member.packageType === 'credit' && member.creditsLeft !== undefined && member.totalCredits !== undefined ? (
+                          member.creditsLeft === 0 ? (
+                            <span className="text-red-700">0 / {member.totalCredits}</span>
+                          ) : (
+                            `${member.creditsLeft} / ${member.totalCredits}`
+                          )
+                        ) : (
+                          'Active'
+                        )
+                      ) : member.packageStatus === 'expiring'
+                        ? 'Expiring Soon'
+                        : member.packageStatus === 'expired'
+                        ? 'Expired'
+                        : 'No Package'}
                     </span>
                   </td>
 
-                  {/* Joined Date */}
                   <td className="px-6 py-4">
-                    <div className="text-sm text-[var(--color-stone)]">{formatDate(member.joinedDate)}</div>
+                    <div className="text-sm text-[var(--color-stone)]">
+                      {new Date(member.joinedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </div>
                   </td>
 
-                  {/* Actions */}
                   <td className="px-6 py-4 relative">
                     <button
                       onClick={() => setActiveMenuId(activeMenuId === member.id ? null : member.id)}
@@ -537,27 +504,82 @@ export function MembersManagement() {
                       <MoreVertical size={18} className="text-[var(--color-stone)]" />
                     </button>
 
-                    {/* Dropdown Menu */}
                     {activeMenuId === member.id && (
                       <>
-                        <div 
-                          className="fixed inset-0 z-10" 
-                          onClick={() => setActiveMenuId(null)}
-                        />
-                        <div className="absolute right-8 top-12 bg-white rounded-lg shadow-xl border border-[var(--color-sand)] py-2 z-20 min-w-[180px]">
-                          <button className="w-full px-4 py-2 text-left text-sm text-[var(--color-earth-dark)] hover:bg-[var(--color-cream)] transition-colors">
-                            View Details
-                          </button>
-                          <button className="w-full px-4 py-2 text-left text-sm text-[var(--color-earth-dark)] hover:bg-[var(--color-cream)] transition-colors">
-                            Edit Profile
-                          </button>
-                          <button className="w-full px-4 py-2 text-left text-sm text-[var(--color-earth-dark)] hover:bg-[var(--color-cream)] transition-colors">
-                            Assign Package
-                          </button>
-                          <div className="border-t border-[var(--color-sand)] my-2" />
-                          <button className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors">
-                            Deactivate Member
-                          </button>
+                        <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
+                        <div className="absolute right-8 top-12 bg-white rounded-lg shadow-xl border border-[var(--color-sand)] py-2 z-20 min-w-[200px]">
+                          {canViewDetails && (
+                            <button
+                              onClick={() => {
+                                setDetailsModal({
+                                  memberId: member.id,
+                                  memberName: member.fullName,
+                                  isInstructor: member.role === 'instructor' || member.role === 'admin',
+                                });
+                                setActiveMenuId(null);
+                              }}
+                              className="w-full px-4 py-2 text-left text-sm text-[var(--color-earth-dark)] hover:bg-[var(--color-cream)] transition-colors"
+                            >
+                              View Details
+                            </button>
+                          )}
+                          {canManageRoles && (
+                            <button
+                              onClick={() => {
+                                setEditProfileModal({
+                                  memberId: member.id,
+                                  currentName: member.fullName,
+                                  currentPhone: member.phone,
+                                });
+                                setActiveMenuId(null);
+                              }}
+                              className="w-full px-4 py-2 text-left text-sm text-[var(--color-earth-dark)] hover:bg-[var(--color-cream)] transition-colors"
+                            >
+                              Edit Profile
+                            </button>
+                          )}
+                          {canAssignPackages && (
+                            <button
+                              onClick={() => {
+                                setAssignPackageModal({
+                                  memberId: member.id,
+                                  memberName: member.fullName,
+                                });
+                                setActiveMenuId(null);
+                              }}
+                              className="w-full px-4 py-2 text-left text-sm text-[var(--color-earth-dark)] hover:bg-[var(--color-cream)] transition-colors"
+                            >
+                              Assign Package
+                            </button>
+                          )}
+                          {canManageRoles && member.role !== 'admin' && (
+                            <>
+                              <div className="border-t border-[var(--color-sand)] my-2" />
+                              {member.role === 'member' ? (
+                                <button
+                                  onClick={() => {
+                                    handleRoleChange(member.id, member.fullName, member.role, 'instructor');
+                                    setActiveMenuId(null);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm text-[var(--color-earth-dark)] hover:bg-[var(--color-cream)] transition-colors flex items-center gap-2"
+                                >
+                                  <Shield size={16} />
+                                  Promote to Instructor
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    handleRoleChange(member.id, member.fullName, member.role, 'member');
+                                    setActiveMenuId(null);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm text-orange-600 hover:bg-orange-50 transition-colors flex items-center gap-2"
+                                >
+                                  <ShieldOff size={16} />
+                                  Demote to Member
+                                </button>
+                              )}
+                            </>
+                          )}
                         </div>
                       </>
                     )}
@@ -568,20 +590,16 @@ export function MembersManagement() {
           </table>
         </div>
 
-        {/* Empty State */}
         {filteredMembers.length === 0 && (
           <div className="p-12 text-center">
             <div className="w-24 h-24 rounded-full bg-[var(--color-cream)] mx-auto mb-4 flex items-center justify-center">
               <UsersIcon size={40} className="text-[var(--color-sage)]" />
             </div>
             <h3 className="text-xl text-[var(--color-earth-dark)] mb-2">No members found</h3>
-            <p className="text-[var(--color-stone)]">
-              {searchQuery ? 'Try adjusting your search or filters' : 'Start by adding your first member'}
-            </p>
+            <p className="text-[var(--color-stone)]">{searchQuery ? 'Try adjusting your search or filters' : 'Start by adding your first member'}</p>
           </div>
         )}
 
-        {/* Results Count */}
         {filteredMembers.length > 0 && (
           <div className="px-6 py-4 border-t border-[var(--color-sand)] bg-[var(--color-cream)]/50">
             <p className="text-sm text-[var(--color-stone)]">
@@ -590,6 +608,49 @@ export function MembersManagement() {
           </div>
         )}
       </div>
+
+      {detailsModal && (
+        <MemberDetailsModal
+          memberId={detailsModal.memberId}
+          memberName={detailsModal.memberName}
+          isInstructor={detailsModal.isInstructor}
+          onClose={() => setDetailsModal(null)}
+        />
+      )}
+
+      {assignPackageModal && (
+        <AssignPackageModal
+          memberId={assignPackageModal.memberId}
+          memberName={assignPackageModal.memberName}
+          onClose={() => setAssignPackageModal(null)}
+          onSuccess={() => fetchMembers()}
+        />
+      )}
+
+      {editProfileModal && (
+        <EditProfileModal
+          memberId={editProfileModal.memberId}
+          currentName={editProfileModal.currentName}
+          currentPhone={editProfileModal.currentPhone}
+          onClose={() => setEditProfileModal(null)}
+          onSuccess={() => fetchMembers()}
+        />
+      )}
+
+      {confirmModal.isOpen && (
+        <ConfirmationModal
+          isOpen={confirmModal.isOpen}
+          title={confirmModal.title}
+          message={confirmModal.message}
+          variant={confirmModal.variant}
+          confirmText={confirmModal.confirmText}
+          onConfirm={() => {
+            confirmModal.onConfirm();
+            setConfirmModal({ ...confirmModal, isOpen: false });
+          }}
+          onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        />
+      )}
     </div>
   );
 }

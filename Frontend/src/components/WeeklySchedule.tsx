@@ -1,13 +1,16 @@
+'use client';
+
 import { Calendar, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { useClasses } from '../hooks';
-import { ClassDetailModal } from './ClassDetailModal';
+import { ClassDetailsModal } from './ClassDetailsModal';
 import type { Tables } from '../types/database.types';
 
 type DbClass = Tables<'classes'>;
 
 interface WeeklyScheduleProps {
   onNavigate: (page: string) => void;
+  initialClasses?: DbClass[];
 }
 
 type ViewMode = 'day' | 'week' | 'month';
@@ -15,7 +18,7 @@ type ViewMode = 'day' | 'week' | 'month';
 const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const calendarDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-export function WeeklySchedule({ onNavigate }: WeeklyScheduleProps) {
+export function WeeklySchedule({ onNavigate, initialClasses }: WeeklyScheduleProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentWeekStart, setCurrentWeekStart] = useState(getWeekStart(new Date()));
@@ -52,16 +55,15 @@ export function WeeklySchedule({ onNavigate }: WeeklyScheduleProps) {
 
   // Use the new useClasses hook with dynamic date filtering
   const { classes: dbClasses, loading, error, fetchClasses } = useClasses({
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
     category: 'class',
+    initialClasses,
     autoFetch: false, // We'll manually trigger fetches
   });
 
   // Fetch classes when date range changes (using stable string dependencies)
   useEffect(() => {
-    const startStr = dateRange.startDate;
-    const endStr = dateRange.endDate;
-    
-    // Pass date range directly to fetchClasses
     fetchClasses();
   }, [dateRange.startDate, dateRange.endDate]);
 
@@ -75,7 +77,7 @@ export function WeeklySchedule({ onNavigate }: WeeklyScheduleProps) {
         minute: '2-digit',
         hour12: true 
       }),
-      instructor: cls.instructor_name || 'Annie Bliss', // Use instructor_name from DB
+      instructor: (cls as any).instructor_name || 'Annie Bliss', // Use instructor_name from DB
       level: cls.level || 'All Levels',
       capacity: cls.capacity,
       enrolled: cls.booked_count,
@@ -560,7 +562,7 @@ export function WeeklySchedule({ onNavigate }: WeeklyScheduleProps) {
 
       {/* Class Detail Modal */}
       {selectedClass && (
-        <ClassDetailModal
+        <ClassDetailsModal
           classData={{
             id: selectedClass.id.toString(),
             title: selectedClass.title,
@@ -569,7 +571,8 @@ export function WeeklySchedule({ onNavigate }: WeeklyScheduleProps) {
               minute: '2-digit',
               hour12: true 
             }),
-            instructor: selectedClass.instructor_name || 'Annie Bliss',
+            starts_at: selectedClass.starts_at,
+            instructor: (selectedClass as any).instructor_name || 'Annie Bliss',
             level: selectedClass.level || 'All Levels',
             capacity: selectedClass.capacity,
             enrolled: selectedClass.booked_count,
@@ -578,7 +581,10 @@ export function WeeklySchedule({ onNavigate }: WeeklyScheduleProps) {
               ? `${Math.round((new Date(selectedClass.ends_at).getTime() - new Date(selectedClass.starts_at).getTime()) / 60000)} min`
               : '60 min',
             description: selectedClass.description || 'A wonderful yoga class to enhance your practice.',
+            long_description: (selectedClass as any).long_description || null,
             room: selectedClass.location || 'Studio A',
+            price: selectedClass.price ?? (selectedClass as any).class_type?.price ?? 0,
+            cover_image_url: (selectedClass as any).cover_image_url || null,
           }}
           onClose={() => setSelectedClass(null)}
           onNavigate={onNavigate}

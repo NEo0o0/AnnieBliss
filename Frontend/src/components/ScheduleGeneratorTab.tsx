@@ -1,53 +1,173 @@
-import { useState } from 'react';
-import { Plus, Trash2, Calendar, Zap, Clock } from 'lucide-react';
+"use client";
+
+import { useState, useEffect } from 'react';
+import { Plus, Trash2, Calendar, Zap, Clock, Loader2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { useClassTypes, useRooms } from '../hooks';
+import { GenerateScheduleModal } from './GenerateScheduleModal';
+import { ConfirmationModal } from './ConfirmationModal';
+import { toast } from 'sonner';
+import { supabase } from '@/utils/supabase/client';
+import { DEFAULT_ROOMS } from '../constants/rooms';
 
 const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const instructors = [
-  { id: 'annie', name: 'Annie Bliss' },
-  { id: 'sarah', name: 'Sarah Chen' },
-  { id: 'mike', name: 'Mike Johnson' },
-  { id: 'maya', name: 'Maya Rodriguez' },
-];
-const rooms = ['Studio A', 'Studio B', 'Outdoor Space'];
 
 export function ScheduleGeneratorTab() {
-  const { classTypes, weeklySlots, addWeeklySlot, deleteWeeklySlot, addClass } = useApp();
+  const { weeklySlots, addWeeklySlot, deleteWeeklySlot, addClass } = useApp();
+  const { classTypes, loading: loadingClassTypes } = useClassTypes();
+  const { rooms: roomsData, loading: loadingRooms } = useRooms();
   const [showAddSlot, setShowAddSlot] = useState(false);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [selectedDay, setSelectedDay] = useState('');
+  const [instructors, setInstructors] = useState<{ id: string; name: string }[]>([]);
+  const [loadingInstructors, setLoadingInstructors] = useState(false);
+  const [submittingSlot, setSubmittingSlot] = useState(false);
   const [slotData, setSlotData] = useState({
     classTypeId: '',
     day: '',
     time: '09:00',
     instructorId: '',
-    room: 'Studio A'
+    room: '',
+    capacity: 20
   });
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+
+  // Fetch instructors from profiles table
+  useEffect(() => {
+    const fetchInstructors = async () => {
+      setLoadingInstructors(true);
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('role', ['instructor', 'admin'])
+          .order('full_name', { ascending: true });
+
+        if (error) throw error;
+
+        setInstructors(
+          (data || []).map(profile => ({
+            id: profile.id,
+            name: profile.full_name || 'Unknown'
+          }))
+        );
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        toast.error(`Failed to load instructors: ${message}`);
+      } finally {
+        setLoadingInstructors(false);
+      }
+    };
+
+    fetchInstructors();
+  }, []);
+
+  // Compute rooms array from hook data, fallback to DEFAULT_ROOMS if empty
+  const rooms = roomsData.length > 0 ? roomsData.map(r => r.name) : [...DEFAULT_ROOMS];
+
+  // Form validation - check if all required fields are filled
+  const isFormValid = !!(
+    slotData.classTypeId &&
+    slotData.day &&
+    slotData.time &&
+    slotData.instructorId &&
+    slotData.room &&
+    slotData.capacity > 0
+  );
 
   const handleAddSlot = () => {
-    if (!slotData.classTypeId || !slotData.day || !slotData.time || !slotData.instructorId) {
-      alert('Please fill in all fields');
+    console.log('=== handleAddSlot called ===');
+    console.log('Current slotData:', slotData);
+    console.log('Validation checks:', {
+      classTypeId: !!slotData.classTypeId,
+      day: !!slotData.day,
+      time: !!slotData.time,
+      instructorId: !!slotData.instructorId,
+      room: !!slotData.room,
+      capacity: slotData.capacity > 0
+    });
+
+    // Validate all required fields
+    if (!slotData.classTypeId) {
+      console.error('Missing classTypeId');
+      toast.error('Please select a class type');
+      return;
+    }
+    if (!slotData.day) {
+      console.error('Missing day');
+      toast.error('Please select a day');
+      return;
+    }
+    if (!slotData.time) {
+      console.error('Missing time');
+      toast.error('Please select a time');
+      return;
+    }
+    if (!slotData.instructorId) {
+      console.error('Missing instructorId');
+      toast.error('Please select an instructor');
+      return;
+    }
+    if (!slotData.room) {
+      console.error('Missing room');
+      toast.error('Please select a room');
+      return;
+    }
+    if (!slotData.capacity || slotData.capacity <= 0) {
+      console.error('Missing or invalid capacity');
+      toast.error('Please enter a valid capacity (greater than 0)');
       return;
     }
 
-    const instructor = instructors.find(i => i.id === slotData.instructorId);
-    const timeFormatted = formatTime(slotData.time);
-    
-    addWeeklySlot({
-      classTypeId: slotData.classTypeId,
-      day: slotData.day,
-      time: timeFormatted,
-      instructorId: slotData.instructorId,
-      room: slotData.room
-    });
+    try {
+      setSubmittingSlot(true);
+      console.log('All validations passed, creating slot...');
+      
+      const instructor = instructors.find(i => i.id === slotData.instructorId);
+      console.log('Found instructor:', instructor);
+      
+      const timeFormatted = formatTime(slotData.time);
+      console.log('Formatted time:', timeFormatted);
+      
+      const newSlot = {
+        classTypeId: slotData.classTypeId,
+        day: slotData.day,
+        time: timeFormatted,
+        instructorId: slotData.instructorId,
+        room: slotData.room,
+        capacity: slotData.capacity
+      };
+      
+      console.log('Adding weekly slot:', newSlot);
+      addWeeklySlot(newSlot);
+      console.log('Slot added successfully');
 
-    setSlotData({
-      classTypeId: '',
-      day: '',
-      time: '09:00',
-      instructorId: '',
-      room: 'Studio A'
-    });
-    setShowAddSlot(false);
+      // Reset form
+      setSlotData({
+        classTypeId: '',
+        day: '',
+        time: '09:00',
+        instructorId: '',
+        room: '',
+        capacity: 20
+      });
+      
+      toast.success('Weekly slot added successfully!');
+      setShowAddSlot(false);
+      console.log('Modal closed');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to add slot';
+      console.error('Error in handleAddSlot:', error);
+      toast.error(message);
+    } finally {
+      setSubmittingSlot(false);
+      console.log('=== handleAddSlot completed ===');
+    }
   };
 
   const formatTime = (time: string) => {
@@ -58,26 +178,158 @@ export function ScheduleGeneratorTab() {
     return `${hour12}:${minutes} ${ampm}`;
   };
 
+  const handleDeleteSlot = (slotId: string, slotName: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Weekly Slot',
+      message: `Are you sure you want to delete the ${slotName} slot? This will not affect already generated classes.`,
+      onConfirm: () => {
+        deleteWeeklySlot(slotId);
+        toast.success('Weekly slot deleted successfully');
+      }
+    });
+  };
+
   const handleGenerateSchedule = () => {
-    const monthInput = prompt('Enter target month (1-12):');
-    const yearInput = prompt('Enter target year (e.g., 2026):');
-    
-    if (!monthInput || !yearInput) return;
-    
-    const month = parseInt(monthInput);
-    const year = parseInt(yearInput);
-    
-    if (month < 1 || month > 12 || year < 2024) {
-      alert('Invalid month or year');
-      return;
-    }
-
     if (weeklySlots.length === 0) {
-      alert('Please add at least one weekly slot before generating a schedule');
+      toast.error('Please add at least one weekly slot before generating a schedule');
       return;
     }
+    setShowGenerateModal(true);
+  };
 
-    generateSchedule(year, month);
+  const handleGenerateConfirm = async (month: number, year: number) => {
+    try {
+      console.log('=== Schedule Generation Started ===');
+      console.log('Generating for:', { month, year, weeklySlots });
+      
+      // Check if weeklySlots is empty
+      if (!weeklySlots || weeklySlots.length === 0) {
+        toast.error('No weekly slots found. Please add at least one weekly slot before generating a schedule.');
+        return;
+      }
+
+      // Client-side schedule generation logic
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const classesToInsert = [];
+
+      // Get current user for created_by field
+      const { data: authData } = await supabase.auth.getUser();
+      const creatorId = authData?.user?.id ?? null;
+
+      console.log('Days in month:', daysInMonth);
+      console.log('Creator ID:', creatorId);
+
+      // Iterate through all days in the month
+      for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(year, month - 1, day);
+        const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+
+        // Find all slots for this day
+        const slotsForDay = weeklySlots.filter(slot => slot.day === dayName);
+        
+        if (slotsForDay.length > 0) {
+          console.log(`Day ${day} (${dayName}): Found ${slotsForDay.length} slots`);
+        }
+
+        for (const slot of slotsForDay) {
+          const classType = classTypes.find(ct => ct.id.toString() === slot.classTypeId);
+          
+          console.log(`  Slot: ${slot.time} - ClassTypeId: ${slot.classTypeId}, Found: ${!!classType}`);
+          
+          if (classType) {
+            // Parse time - handle both 24-hour format (HH:mm) and 12-hour format (h:mm AM/PM)
+            let hours = 0;
+            let minutes = 0;
+            
+            try {
+              const timeStr = slot.time.trim();
+              
+              // Check if time contains AM/PM
+              if (timeStr.includes('AM') || timeStr.includes('PM') || timeStr.includes('am') || timeStr.includes('pm')) {
+                // 12-hour format
+                const isPM = timeStr.toUpperCase().includes('PM');
+                const timeOnly = timeStr.replace(/\s*(AM|PM|am|pm)\s*/g, '').trim();
+                const [h, m] = timeOnly.split(':').map(Number);
+                
+                hours = h;
+                minutes = m || 0;
+                
+                // Convert to 24-hour format
+                if (isPM && hours !== 12) {
+                  hours += 12;
+                } else if (!isPM && hours === 12) {
+                  hours = 0;
+                }
+              } else {
+                // 24-hour format
+                const [h, m] = timeStr.split(':').map(Number);
+                hours = h;
+                minutes = m || 0;
+              }
+              
+              // Create date object
+              const startsAt = new Date(year, month - 1, day, hours, minutes);
+              
+              // Validate the date
+              if (isNaN(startsAt.getTime())) {
+                console.error(`Invalid Date created from slot time: "${slot.time}" -> hours: ${hours}, minutes: ${minutes}`);
+                continue; // Skip this slot
+              }
+              
+              const durationMinutes = classType.duration_minutes ?? 60;
+              const endsAt = new Date(startsAt.getTime() + durationMinutes * 60000);
+
+              classesToInsert.push({
+                title: classType.title,
+                description: classType.description,
+                level: classType.level ?? 'All Levels',
+                capacity: slot.capacity ?? 20,
+                class_type_id: classType.id,
+                price: classType.default_price ?? null,
+                starts_at: startsAt.toISOString(),
+                ends_at: endsAt.toISOString(),
+                category: 'class',
+                location: slot.room,
+                instructor_id: slot.instructorId,
+                created_by: creatorId
+              });
+            } catch (parseError) {
+              console.error(`Failed to parse time for slot: "${slot.time}"`, parseError);
+              continue; // Skip this slot
+            }
+          } else {
+            console.warn(`  Class type not found for slot with classTypeId: ${slot.classTypeId}`);
+          }
+        }
+      }
+
+      console.log('Total classes to insert:', classesToInsert.length);
+
+      if (classesToInsert.length === 0) {
+        console.error('No classes generated. Check day name matching and class type IDs.');
+        toast.error('No classes to generate. Please check your weekly slots and ensure class types are properly configured.');
+        return;
+      }
+
+      // Insert all classes
+      console.log('Inserting classes into database...');
+      const { error } = await supabase.from('classes').insert(classesToInsert);
+
+      if (error) {
+        console.error('Database insert error:', error);
+        throw error;
+      }
+
+      const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long' });
+      console.log(`✅ Schedule generated successfully: ${classesToInsert.length} classes created`);
+      toast.success(`Schedule generated for ${monthName} ${year}! Created ${classesToInsert.length} classes.`, { duration: 4000 });
+      setShowGenerateModal(false);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      console.error('Schedule generation error:', e);
+      toast.error(`Failed to generate schedule: ${message}`);
+    }
   };
 
   const generateSchedule = (year: number, month: number) => {
@@ -165,7 +417,8 @@ export function ScheduleGeneratorTab() {
           </button>
           <button
             onClick={handleGenerateSchedule}
-            className="bg-[var(--color-clay)] hover:bg-[var(--color-earth-dark)] text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg"
+            disabled={weeklySlots.length === 0}
+            className="bg-[var(--color-clay)] hover:bg-[var(--color-earth-dark)] text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Zap size={20} />
             <span>Generate Schedule</span>
@@ -208,7 +461,7 @@ export function ScheduleGeneratorTab() {
                             style={{ backgroundColor: `${getClassTypeColor(slot.classTypeId)}20` }}
                           >
                             <button
-                              onClick={() => deleteWeeklySlot(slot.id)}
+                              onClick={() => handleDeleteSlot(slot.id, getClassTypeName(slot.classTypeId))}
                               className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center"
                             >
                               <Trash2 size={12} />
@@ -342,10 +595,26 @@ export function ScheduleGeneratorTab() {
                   onChange={(e) => setSlotData({ ...slotData, room: e.target.value })}
                   className="w-full px-4 py-3 rounded-lg border border-[var(--color-sand)] focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent transition-all duration-300"
                 >
+                  <option value="">-- Select Room --</option>
                   {rooms.map(room => (
                     <option key={room} value={room}>{room}</option>
                   ))}
                 </select>
+              </div>
+
+              {/* Capacity */}
+              <div>
+                <label className="block text-sm text-[var(--color-stone)] mb-2">
+                  Capacity *
+                </label>
+                <input
+                  type="number"
+                  value={slotData.capacity}
+                  onChange={(e) => setSlotData({ ...slotData, capacity: parseInt(e.target.value) || 0 })}
+                  className="w-full px-4 py-3 rounded-lg border border-[var(--color-sand)] focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent transition-all duration-300"
+                  min="1"
+                  placeholder="e.g., 20"
+                />
               </div>
 
               {/* Actions */}
@@ -358,16 +627,44 @@ export function ScheduleGeneratorTab() {
                 </button>
                 <button
                   onClick={handleAddSlot}
-                  className="bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg"
+                  disabled={!isFormValid || submittingSlot}
+                  className="bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[var(--color-sage)]"
                 >
-                  <Plus size={20} />
-                  <span>Add Slot</span>
+                  {submittingSlot ? (
+                    <>
+                      <Loader2 size={20} className="animate-spin" />
+                      <span>Adding...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={20} />
+                      <span>Add Slot</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Generate Schedule Modal */}
+      <GenerateScheduleModal
+        isOpen={showGenerateModal}
+        onClose={() => setShowGenerateModal(false)}
+        onGenerate={handleGenerateConfirm}
+      />
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant="warning"
+        confirmText="Delete"
+      />
     </div>
   );
 }

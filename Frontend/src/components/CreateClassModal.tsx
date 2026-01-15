@@ -1,33 +1,222 @@
+"use client";
+
 import { X } from 'lucide-react';
-import { useState } from 'react';
-import { useApp } from '../context/AppContext';
+import { useEffect, useMemo, useState } from 'react';
+import { supabase } from '@/utils/supabase/client';
+import type { Tables, TablesInsert } from '@/types/database.types';
 
 interface CreateClassModalProps {
   onClose: () => void;
+  onCreated?: () => void;
 }
 
-export function CreateClassModal({ onClose }: CreateClassModalProps) {
-  const { addClass } = useApp();
+type ClassTypeRow = Tables<'class_types'>;
+
+function formatDuration(minutes: number | null) {
+  const safe = typeof minutes === 'number' && Number.isFinite(minutes) ? minutes : 60;
+  return `${safe} min`;
+}
+
+function parseDurationToMinutes(value: string) {
+  const match = value.match(/(\d+)/);
+  const parsed = match ? Number(match[1]) : NaN;
+  return Number.isFinite(parsed) ? parsed : 60;
+}
+
+export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) {
+  const [classTypes, setClassTypes] = useState<ClassTypeRow[]>([]);
+  const [classTypesLoading, setClassTypesLoading] = useState(false);
+  const [classTypesError, setClassTypesError] = useState<string | null>(null);
+
+  const [instructors, setInstructors] = useState<Array<{ id: string; full_name: string | null }>>([]);
+  const [instructorsLoading, setInstructorsLoading] = useState(false);
+  const [instructorsError, setInstructorsError] = useState<Error | null>(null);
+
+  const [rooms, setRooms] = useState<Array<{ id: number; name: string }>>([]);
+  const [roomsLoading, setRoomsLoading] = useState(false);
+  const [roomsError, setRoomsError] = useState<string | null>(null);
+
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   const [formData, setFormData] = useState({
+    category: 'class' as 'class' | 'workshop' | 'teacher_training' | 'retreat',
+    classTypeId: '' as '' | string,
     title: '',
+    date: '',
     time: '',
-    instructor: '',
+    instructorId: '' as '' | string,
     level: 'All Levels',
     capacity: 20,
-    day: 'Monday',
     duration: '60 min',
     description: '',
-    room: 'Studio A'
+    long_description: '',
+    cover_image_url: '',
+    room: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const selectedClassType = useMemo(() => {
+    const id = Number(formData.classTypeId);
+    if (!Number.isFinite(id)) return null;
+    return classTypes.find((t) => t.id === id) ?? null;
+  }, [classTypes, formData.classTypeId]);
+
+  useEffect(() => {
+    const loadTypes = async () => {
+      setClassTypesLoading(true);
+      setClassTypesError(null);
+      try {
+        const { data, error } = await supabase
+          .from('class_types')
+          .select('id, title, description, duration_minutes')
+          .order('title', { ascending: true });
+        if (error) throw error;
+        setClassTypes((data ?? []) as ClassTypeRow[]);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        setClassTypesError(message);
+      } finally {
+        setClassTypesLoading(false);
+      }
+    };
+
+    void loadTypes();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedClassType) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      title: selectedClassType.title ?? prev.title,
+      duration: formatDuration(selectedClassType.duration_minutes),
+      description: selectedClassType.description ?? prev.description,
+    }));
+  }, [selectedClassType]);
+
+  useEffect(() => {
+    const loadInstructors = async () => {
+      setInstructorsLoading(true);
+      setInstructorsError(null);
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('role', ['admin', 'instructor'])
+          .order('full_name', { ascending: true });
+
+        if (error) throw error;
+        setInstructors((data ?? []) as Array<{ id: string; full_name: string | null }>);
+      } catch (e) {
+        const err: any = e;
+        const asError = err instanceof Error ? err : new Error(err?.message ?? String(err));
+        setInstructorsError(asError);
+        console.error('Failed to load instructors:', {
+          message: err?.message,
+          details: err?.details,
+          hint: err?.hint,
+          code: err?.code,
+          raw: e,
+        });
+        setInstructors([]);
+      } finally {
+        setInstructorsLoading(false);
+      }
+    };
+
+    void loadInstructors();
+  }, []);
+
+  useEffect(() => {
+    const loadRooms = async () => {
+      setRoomsLoading(true);
+      setRoomsError(null);
+      try {
+        const { data, error } = await supabase
+          .from('rooms' as any)
+          .select('id, name')
+          .order('name', { ascending: true });
+
+        if (error) throw error;
+        setRooms((data ?? []) as any);
+
+        setFormData((prev) => {
+          if (prev.room) return prev;
+          const first = (data ?? [])[0] as any;
+          return first?.name ? { ...prev, room: String(first.name) } : prev;
+        });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        setRoomsError(message);
+        setRooms([]);
+      } finally {
+        setRoomsLoading(false);
+      }
+    };
+
+    void loadRooms();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    addClass({
-      ...formData,
-      enrolled: 0
-    });
-    alert('Class created successfully!');
-    onClose();
+    setSubmitError(null);
+
+    // Class type is required only for 'class' category
+    const classTypeId = formData.classTypeId ? Number(formData.classTypeId) : null;
+    if (formData.category === 'class' && !Number.isFinite(classTypeId)) {
+      setSubmitError('Please select a class type for regular classes');
+      return;
+    }
+    if (!formData.date || !formData.time) {
+      setSubmitError('Please select a date and time');
+      return;
+    }
+    if (!formData.instructorId) {
+      setSubmitError('Please select an instructor');
+      return;
+    }
+
+    const startsLocal = new Date(`${formData.date}T${formData.time}`);
+    if (Number.isNaN(startsLocal.getTime())) {
+      setSubmitError('Invalid date/time');
+      return;
+    }
+
+    const durationMinutes = selectedClassType?.duration_minutes ?? parseDurationToMinutes(formData.duration);
+    const endsLocal = new Date(startsLocal.getTime() + durationMinutes * 60_000);
+
+    setSubmitLoading(true);
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const creatorId = authData?.user?.id ?? null;
+
+      const insertPayload: TablesInsert<'classes'> = {
+        title: formData.title,
+        description: formData.description,
+        long_description: formData.long_description || null,
+        cover_image_url: formData.cover_image_url || null,
+        level: formData.level,
+        capacity: Number(formData.capacity),
+        class_type_id: classTypeId,
+        starts_at: startsLocal.toISOString(),
+        ends_at: endsLocal.toISOString(),
+        category: formData.category,
+        location: formData.room,
+        instructor_id: formData.instructorId,
+        created_by: creatorId,
+      };
+
+      const { error } = await supabase.from('classes').insert(insertPayload);
+      if (error) throw error;
+
+      onClose();
+      onCreated?.();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setSubmitError(message || 'Failed to create class');
+    } finally {
+      setSubmitLoading(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -59,6 +248,54 @@ export function CreateClassModal({ onClose }: CreateClassModalProps) {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          {/* Category */}
+          <div>
+            <label className="block text-sm text-[var(--color-stone)] mb-2">
+              Category *
+            </label>
+            <select
+              name="category"
+              value={formData.category}
+              onChange={handleChange}
+              required
+              className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
+            >
+              <option value="class">Class</option>
+              <option value="workshop">Workshop</option>
+              <option value="teacher_training">Teacher Training</option>
+              <option value="retreat">Retreat</option>
+            </select>
+          </div>
+
+          {/* Class Type */}
+          <div>
+            <label className="block text-sm text-[var(--color-stone)] mb-2">
+              Class Type {formData.category === 'class' ? '*' : '(Optional)'}
+            </label>
+            <select
+              name="classTypeId"
+              value={formData.classTypeId}
+              onChange={handleChange}
+              required={formData.category === 'class'}
+              className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
+            >
+              <option value="">{classTypesLoading ? 'Loading…' : 'Select a class type'}</option>
+              {classTypes.map((t) => (
+                <option key={t.id} value={String(t.id)}>
+                  {t.title}
+                </option>
+              ))}
+            </select>
+            {formData.category !== 'class' && (
+              <p className="mt-1 text-xs text-[var(--color-stone)]">
+                Class type is optional for {formData.category === 'workshop' ? 'workshops' : formData.category === 'teacher_training' ? 'teacher trainings' : 'retreats'}
+              </p>
+            )}
+            {classTypesError ? (
+              <div className="mt-2 text-sm text-red-700">{classTypesError}</div>
+            ) : null}
+          </div>
+
           {/* Class Title */}
           <div>
             <label className="block text-sm text-[var(--color-stone)] mb-2">
@@ -79,23 +316,16 @@ export function CreateClassModal({ onClose }: CreateClassModalProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-[var(--color-stone)] mb-2">
-                Day *
+                Date *
               </label>
-              <select
-                name="day"
-                value={formData.day}
+              <input
+                type="date"
+                name="date"
+                value={formData.date}
                 onChange={handleChange}
                 required
                 className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
-              >
-                <option value="Monday">Monday</option>
-                <option value="Tuesday">Tuesday</option>
-                <option value="Wednesday">Wednesday</option>
-                <option value="Thursday">Thursday</option>
-                <option value="Friday">Friday</option>
-                <option value="Saturday">Saturday</option>
-                <option value="Sunday">Sunday</option>
-              </select>
+              />
             </div>
 
             <div>
@@ -103,12 +333,11 @@ export function CreateClassModal({ onClose }: CreateClassModalProps) {
                 Time *
               </label>
               <input
-                type="text"
+                type="time"
                 name="time"
                 value={formData.time}
                 onChange={handleChange}
                 required
-                placeholder="e.g., 07:00 AM"
                 className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
               />
             </div>
@@ -120,15 +349,26 @@ export function CreateClassModal({ onClose }: CreateClassModalProps) {
               <label className="block text-sm text-[var(--color-stone)] mb-2">
                 Instructor *
               </label>
-              <input
-                type="text"
-                name="instructor"
-                value={formData.instructor}
+              <select
+                name="instructorId"
+                value={formData.instructorId}
                 onChange={handleChange}
                 required
-                placeholder="e.g., Annie Bliss"
                 className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
-              />
+              >
+                <option value="">{instructorsLoading ? 'Loading…' : 'Select an instructor'}</option>
+                {instructors.map((p) => {
+                  const label = p.full_name ?? p.id;
+                  return (
+                    <option key={p.id} value={p.id}>
+                      {label}
+                    </option>
+                  );
+                })}
+              </select>
+              {instructorsError ? (
+                <div className="mt-2 text-sm text-red-700">{instructorsError.message}</div>
+              ) : null}
             </div>
 
             <div>
@@ -181,10 +421,16 @@ export function CreateClassModal({ onClose }: CreateClassModalProps) {
                 required
                 className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
               >
-                <option value="Studio A">Studio A</option>
-                <option value="Studio B">Studio B</option>
-                <option value="Studio C">Studio C</option>
+                <option value="">{roomsLoading ? 'Loading…' : 'Select a room'}</option>
+                {rooms.map((r) => (
+                  <option key={r.id} value={r.name}>
+                    {r.name}
+                  </option>
+                ))}
               </select>
+              {roomsError ? (
+                <div className="mt-2 text-sm text-red-700">{roomsError}</div>
+              ) : null}
             </div>
 
             <div>
@@ -220,6 +466,39 @@ export function CreateClassModal({ onClose }: CreateClassModalProps) {
             />
           </div>
 
+          {/* Long Description */}
+          <div>
+            <label className="block text-sm text-[var(--color-stone)] mb-2">
+              Long Description (Optional)
+            </label>
+            <textarea
+              name="long_description"
+              value={formData.long_description}
+              onChange={handleChange}
+              rows={6}
+              placeholder="Provide detailed information about what students will learn, class flow, benefits, etc..."
+              className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300 resize-none"
+            />
+          </div>
+
+          {/* Cover Image URL */}
+          <div>
+            <label className="block text-sm text-[var(--color-stone)] mb-2">
+              Cover Image URL (Optional)
+            </label>
+            <input
+              type="text"
+              name="cover_image_url"
+              value={formData.cover_image_url}
+              onChange={handleChange}
+              placeholder="https://example.com/image.jpg"
+              className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
+            />
+            <p className="mt-1 text-xs text-[var(--color-stone)]">
+              Enter a URL to an image. File upload will be available in a future update.
+            </p>
+          </div>
+
           {/* Action Buttons */}
           <div className="flex gap-4 pt-4">
             <button
@@ -231,11 +510,15 @@ export function CreateClassModal({ onClose }: CreateClassModalProps) {
             </button>
             <button
               type="submit"
+              disabled={submitLoading}
               className="flex-1 px-6 py-3 bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl"
             >
-              Create Class
+              {submitLoading ? 'Creating…' : 'Create Class'}
             </button>
           </div>
+          {submitError ? (
+            <div className="text-sm text-red-700">{submitError}</div>
+          ) : null}
         </form>
       </div>
     </div>

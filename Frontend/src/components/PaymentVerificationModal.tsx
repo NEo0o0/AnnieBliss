@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from 'react';
 import { X, Check, XCircle, Eye, Clock, User, CreditCard } from 'lucide-react';
 

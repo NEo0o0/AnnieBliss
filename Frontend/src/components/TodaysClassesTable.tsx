@@ -1,5 +1,9 @@
-import { useState } from 'react';
+"use client";
+
+import { useMemo, useState } from 'react';
 import React from 'react';
+import { ConfirmationModal } from './ConfirmationModal';
+
 import { 
   Clock, 
   ChevronDown, 
@@ -9,11 +13,8 @@ import {
   Facebook, 
   AlertCircle,
   UserCheck,
-  ExternalLink,
   UserPlus,
-  Users,
-  DollarSign,
-  CheckCircle
+  X
 } from 'lucide-react';
 
 interface Booking {
@@ -26,12 +27,15 @@ interface Booking {
   contactPlatform: string;
   status: 'confirmed' | 'checked-in';
   bookingTime: string;
-  isGuest?: boolean; // Flag to indicate if this is a guest booking
-  user_id?: string | null; // null for guest bookings
+  isGuest?: boolean;
+  user_id?: string | null;
   guest_name?: string | null;
   guest_contact?: string | null;
-  paymentStatus?: 'paid' | 'unpaid'; // Payment status for guest bookings
-  paymentAmount?: number; // Amount if payment was made
+  paymentStatus?: 'paid' | 'unpaid';
+  amountDue?: number;
+  amountPaid?: number;
+  paidAt?: string | null;
+  isAttended?: boolean;
 }
 
 interface ClassItem {
@@ -41,6 +45,7 @@ interface ClassItem {
   booked: number;
   capacity: number;
   instructor: string;
+  room?: string;
   bookings?: Booking[];
 }
 
@@ -49,33 +54,91 @@ interface TodaysClassesTableProps {
   bookings: Record<number, Booking[]>;
   onManualBooking?: (classId: number, className: string, classTime: string) => void;
   onMarkAsPaid?: (bookingId: string, classId: number, className: string, amount: number) => void;
+  onCancelBooking?: (bookingId: string, classId: number, className: string) => void;
+  onToggleAttendance?: (bookingId: string, classId: number, nextValue: boolean) => void;
+  onTogglePaymentStatus?: (
+    bookingId: string,
+    classId: number,
+    nextStatus: 'paid' | 'unpaid',
+    amountDue: number
+  ) => void;
 }
 
-export function TodaysClassesTable({ classes, bookings, onManualBooking, onMarkAsPaid }: TodaysClassesTableProps) {
+interface ConfirmModalState {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  onConfirm: () => void;
+  variant?: 'default' | 'warning' | 'success';
+  confirmText?: string;
+}
+
+export function TodaysClassesTable({
+  classes,
+  bookings,
+  onManualBooking,
+  onMarkAsPaid,
+  onCancelBooking,
+  onToggleAttendance,
+  onTogglePaymentStatus,
+}: TodaysClassesTableProps) {
   const [expandedClassId, setExpandedClassId] = useState<number | null>(null);
-  const [checkedInStudents, setCheckedInStudents] = useState<Set<string>>(
-    new Set(
-      // Pre-populate with already checked-in students
+  const [confirmModal, setConfirmModal] = useState<ConfirmModalState>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
+  const checkedInStudents = useMemo(() => {
+    return new Set(
       Object.values(bookings)
         .flat()
-        .filter(b => b.status === 'checked-in')
-        .map(b => b.id)
-    )
-  );
+        .filter((b) => Boolean((b as any).isAttended))
+        .map((b) => b.id)
+    );
+  }, [bookings]);
 
   const toggleRow = (classId: number) => {
     setExpandedClassId(expandedClassId === classId ? null : classId);
   };
 
-  const handleCheckIn = (bookingId: string) => {
-    setCheckedInStudents(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(bookingId)) {
-        newSet.delete(bookingId);
-      } else {
-        newSet.add(bookingId);
-      }
-      return newSet;
+  const handleCheckIn = (bookingId: string, classId: number) => {
+    const classBookings = bookings[classId] || [];
+    const booking = classBookings.find((b) => String(b.id) === String(bookingId));
+    const nextValue = !Boolean((booking as any)?.isAttended);
+    onToggleAttendance?.(bookingId, classId, nextValue);
+  };
+
+  const handleTogglePayment = (booking: Booking, classId: number) => {
+    if (!onTogglePaymentStatus) return;
+
+    const amountDue = Number(booking.amountDue ?? 0);
+    const isPaid = booking.paymentStatus === 'paid';
+
+    if (!isPaid) {
+      setConfirmModal({
+        isOpen: true,
+        title: 'Confirm Payment',
+        message: `Confirm payment of ${amountDue} THB for this student?`,
+        variant: 'success',
+        confirmText: 'Mark as Paid',
+        onConfirm: () => {
+          onTogglePaymentStatus(String(booking.id), classId, 'paid', amountDue);
+        },
+      });
+      return;
+    }
+
+    setConfirmModal({
+      isOpen: true,
+      title: 'Mark as Unpaid',
+      message: 'Change status back to UNPAID? This will remove the recorded payment.',
+      variant: 'warning',
+      confirmText: 'Mark Unpaid',
+      onConfirm: () => {
+        onTogglePaymentStatus(String(booking.id), classId, 'unpaid', amountDue);
+      },
     });
   };
 
@@ -128,6 +191,9 @@ export function TodaysClassesTable({ classes, bookings, onManualBooking, onMarkA
               <th className="px-4 md:px-6 py-3 text-left text-xs uppercase tracking-wider text-[var(--color-stone)] hidden md:table-cell">
                 Instructor
               </th>
+              <th className="px-4 md:px-6 py-3 text-left text-xs uppercase tracking-wider text-[var(--color-stone)] hidden lg:table-cell">
+                Room
+              </th>
               <th className="px-4 md:px-6 py-3 text-left text-xs uppercase tracking-wider text-[var(--color-stone)]">
                 Booked
               </th>
@@ -161,6 +227,9 @@ export function TodaysClassesTable({ classes, bookings, onManualBooking, onMarkA
                     <td className="px-4 md:px-6 py-4 hidden md:table-cell">
                       <div className="text-sm text-[var(--color-stone)]">{classItem.instructor}</div>
                     </td>
+                    <td className="px-4 md:px-6 py-4 hidden lg:table-cell">
+                      <div className="text-sm text-[var(--color-stone)]">{classItem.room || '—'}</div>
+                    </td>
                     <td className="px-4 md:px-6 py-4">
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                         <span className={`text-base md:text-lg ${getCapacityColor(classItem.booked, classItem.capacity)}`}>
@@ -184,11 +253,23 @@ export function TodaysClassesTable({ classes, bookings, onManualBooking, onMarkA
                   {/* Expanded Student List Row */}
                   {isExpanded && (
                     <tr>
-                      <td colSpan={5} className="px-4 md:px-6 py-0">
+                      <td colSpan={6} className="px-4 md:px-6 py-0">
                         <div className="bg-[var(--color-cream)]/30 py-4 animate-fadeIn">
                           {classBookings.length === 0 ? (
                             <div className="text-center py-8 text-[var(--color-stone)]">
                               <p>No students registered yet</p>
+                              {onManualBooking ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onManualBooking(classItem.id, classItem.name, classItem.time);
+                                  }}
+                                  className="mt-4 bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white px-4 py-2 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+                                >
+                                  Book Student
+                                </button>
+                              ) : null}
                             </div>
                           ) : (
                             <div className="space-y-2">
@@ -271,7 +352,7 @@ export function TodaysClassesTable({ classes, bookings, onManualBooking, onMarkA
                                           </div>
                                         )}
 
-                                        {/* Status Badge */}
+                                        {/* Status Badges */}
                                         <div className="flex items-center gap-2">
                                           <span 
                                             className={`px-3 py-1 rounded-full text-xs whitespace-nowrap ${
@@ -282,11 +363,42 @@ export function TodaysClassesTable({ classes, bookings, onManualBooking, onMarkA
                                           >
                                             {checkedInStudents.has(booking.id) ? 'Checked-in' : 'Confirmed'}
                                           </span>
+
+                                          {/* Interactive Payment Status Badge */}
+                                          {onTogglePaymentStatus ? (
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleTogglePayment(booking, classItem.id);
+                                              }}
+                                              className={`px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md ${
+                                                booking.paymentStatus === 'paid'
+                                                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                                  : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                                              }`}
+                                              title={booking.paymentStatus === 'paid' ? 'Click to mark as unpaid' : 'Click to mark as paid'}
+                                            >
+                                              {booking.paymentStatus === 'paid' ? '✓ Paid' : 'Unpaid'}
+                                            </button>
+                                          ) : (
+                                            <span
+                                              className={`px-3 py-1 rounded-full text-xs whitespace-nowrap ${
+                                                booking.paymentStatus === 'paid'
+                                                  ? 'bg-green-100 text-green-700'
+                                                  : 'bg-amber-100 text-amber-800'
+                                              }`}
+                                            >
+                                              {booking.paymentStatus === 'paid' ? 'Paid' : 'Unpaid'}
+                                            </span>
+                                          )}
                                         </div>
 
                                         {/* Check-in Button */}
                                         <button
-                                          onClick={() => handleCheckIn(booking.id)}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleCheckIn(booking.id, classItem.id);
+                                          }}
                                           className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-all duration-200 flex items-center gap-1.5 ${
                                             checkedInStudents.has(booking.id)
                                               ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -297,14 +409,18 @@ export function TodaysClassesTable({ classes, bookings, onManualBooking, onMarkA
                                           {checkedInStudents.has(booking.id) ? 'Undo' : 'Check-in'}
                                         </button>
 
-                                        {/* Mark as Paid Button */}
-                                        {booking.isGuest && booking.paymentStatus === 'unpaid' && (
+                                        {/* Cancel Booking */}
+                                        {onCancelBooking && (
                                           <button
-                                            onClick={() => onMarkAsPaid?.(booking.id, classItem.id, classItem.name, booking.paymentAmount || 0)}
-                                            className="px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-all duration-200 flex items-center gap-1.5 bg-[var(--color-sage)] text-white hover:bg-[var(--color-clay)] shadow-sm hover:shadow-md"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              onCancelBooking(booking.id, classItem.id, classItem.name);
+                                            }}
+                                            className="px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-all duration-200 flex items-center gap-1.5 bg-red-50 text-red-700 hover:bg-red-100"
+                                            title="Cancel booking"
                                           >
-                                            <DollarSign size={14} />
-                                            Mark as Paid
+                                            <X size={14} />
+                                            Cancel
                                           </button>
                                         )}
                                       </div>
@@ -324,6 +440,17 @@ export function TodaysClassesTable({ classes, bookings, onManualBooking, onMarkA
           </tbody>
         </table>
       </div>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        confirmText={confirmModal.confirmText}
+      />
     </div>
   );
 }

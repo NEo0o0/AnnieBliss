@@ -5,6 +5,7 @@ import {
   Calendar, 
   Clock, 
   LogOut, 
+  Home,
   Settings as SettingsIcon,
   ChevronRight,
   X,
@@ -317,6 +318,15 @@ export function MemberDashboard({ userData, onLogout, onNavigateToAdmin, onNavig
                 >
                   <Shield size={18} />
                   <span className="hidden sm:inline">Admin Dashboard</span>
+                </button>
+              )}
+              {onNavigateHome && (
+                <button
+                  onClick={onNavigateHome}
+                  className="flex items-center gap-2 px-4 py-2 text-[var(--color-stone)] hover:text-[var(--color-earth-dark)] hover:bg-[var(--color-cream)] rounded-lg transition-all duration-300"
+                >
+                  <Home size={18} />
+                  <span className="hidden sm:inline">Back to Home</span>
                 </button>
               )}
               <button

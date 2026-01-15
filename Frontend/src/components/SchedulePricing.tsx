@@ -1,64 +1,77 @@
-import { Calendar, Clock, MapPin, Check } from 'lucide-react';
-import { useState } from 'react';
-import { useApp } from '../context/AppContext';
-import { TrainingDetailModal } from './TrainingDetailModal';
+"use client";
 
-interface SchedulePricingProps {
-  onNavigate: (page: string) => void;
+import { Calendar, Clock, MapPin, Check } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { useTeacherTraining } from '../hooks/useTeacherTraining';
+import { TrainingDetailModal } from './TrainingDetailModal';
+import type { Tables } from '../types/database.types';
+
+type Training = Tables<'classes'> & {
+  early_bird_price: number | null;
+  early_bird_deadline: string | null;
+  registration_opens_at: string | null;
+};
+
+function formatDateRange(startsAt: string, endsAt: string | null) {
+  const start = new Date(startsAt);
+  const end = new Date(endsAt ?? startsAt);
+
+  const sameYear = start.getFullYear() === end.getFullYear();
+  const sameMonth = sameYear && start.getMonth() === end.getMonth();
+
+  const startMonth = start.toLocaleDateString('en-US', { month: 'short' });
+  const endMonth = end.toLocaleDateString('en-US', { month: 'short' });
+
+  if (sameMonth) {
+    return `${startMonth} ${start.getDate()} - ${end.getDate()}, ${start.getFullYear()}`;
+  }
+
+  if (sameYear) {
+    return `${startMonth} ${start.getDate()} - ${endMonth} ${end.getDate()}, ${start.getFullYear()}`;
+  }
+
+  return `${startMonth} ${start.getDate()}, ${start.getFullYear()} - ${endMonth} ${end.getDate()}, ${end.getFullYear()}`;
 }
 
-const pricingPackages = [
-  {
-    name: 'Early Bird',
-    price: '$2,800',
-    originalPrice: '$3,200',
-    description: 'Save $400 when you register 60+ days before start date',
-    features: [
-      'Complete 200-hour program',
-      'All training materials included',
-      'Yoga Alliance certification',
-      'Lifetime alumni support',
-      'Course manual & textbooks',
-    ],
-    badge: 'Best Value',
-    highlighted: true,
-  },
-  {
-    name: 'Standard',
-    price: '$3,200',
-    description: 'Full tuition for 200-hour teacher training program',
-    features: [
-      'Complete 200-hour program',
-      'All training materials included',
-      'Yoga Alliance certification',
-      'Lifetime alumni support',
-      'Course manual & textbooks',
-    ],
-    badge: null,
-    highlighted: false,
-  },
-  {
-    name: 'Payment Plan',
-    price: '$3,400',
-    description: 'Split your tuition into 4 monthly payments',
-    features: [
-      'Complete 200-hour program',
-      'All training materials included',
-      'Yoga Alliance certification',
-      'Lifetime alumni support',
-      '4 monthly installments of $850',
-    ],
-    badge: 'Flexible',
-    highlighted: false,
-  },
-];
+function formatMoney(amount: number | null | undefined) {
+  if (!amount || amount === 0) return 'Free';
+  return `฿${amount.toLocaleString()}`;
+}
 
-export function SchedulePricing({ onNavigate }: SchedulePricingProps) {
-  const { classes } = useApp();
-  const [selectedTraining, setSelectedTraining] = useState<any>(null);
+function formatSessionLabel(startsAt: string) {
+  const start = new Date(startsAt);
+  return start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
 
-  // Filter training sessions from classes
-  const trainingSessions = classes.filter(cls => cls.category === 'training');
+export function SchedulePricing({ initialTrainings }: { initialTrainings?: Training[] }) {
+  const { trainings, loading } = useTeacherTraining({ initialTrainings });
+  const [selectedTraining, setSelectedTraining] = useState<Training | null>(null);
+
+  const now = useMemo(() => new Date(), []);
+
+  const standardTraining = trainings[0] ?? null;
+
+  const earlyBirdTraining = useMemo(() => {
+    return (
+      trainings.find((t: Training) => {
+        if (t.early_bird_price == null) return false;
+        if (!t.early_bird_deadline) return false;
+        const deadline = new Date(t.early_bird_deadline);
+        if (Number.isNaN(deadline.getTime())) return false;
+        return now <= deadline;
+      }) ?? null
+    );
+  }, [now, trainings]);
+
+  const paymentPlanTotal = useMemo(() => {
+    if (!standardTraining?.price) return null;
+    return Math.round(standardTraining.price * 1.1);
+  }, [standardTraining?.price]);
+
+  const paymentPlanMonthly = useMemo(() => {
+    if (!paymentPlanTotal) return null;
+    return Math.round(paymentPlanTotal / 4);
+  }, [paymentPlanTotal]);
 
   return (
     <>
@@ -74,26 +87,41 @@ export function SchedulePricing({ onNavigate }: SchedulePricingProps) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {trainingSessions.map((session) => {
-                const spotsRemaining = session.capacity - session.enrolled;
+              {trainings.map((training: Training) => {
+                const spotsRemaining = training.capacity - training.booked_count;
+                const registrationOpensAt = training.registration_opens_at
+                  ? new Date(training.registration_opens_at)
+                  : null;
+                const earlyBirdDeadline = training.early_bird_deadline
+                  ? new Date(training.early_bird_deadline)
+                  : null;
+
+                const badgeLabel = (() => {
+                  if (registrationOpensAt && now < registrationOpensAt) return 'Coming Soon';
+                  if (earlyBirdDeadline && now <= earlyBirdDeadline) return 'Early Bird';
+                  return null;
+                })();
+
                 return (
                   <button
-                    key={session.id}
-                    onClick={() => setSelectedTraining(session)}
+                    key={training.id}
+                    onClick={() => setSelectedTraining(training)}
                     className="bg-white rounded-lg p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 text-left"
                   >
                     {/* Status Badge */}
                     <div className="flex items-center justify-between mb-4">
-                      <span className="text-2xl text-[var(--color-earth-dark)]">{session.season}</span>
-                      <span className={`px-3 py-1 rounded-full text-xs ${
-                        session.status === 'Enrolling Now'
-                          ? 'bg-[var(--color-sage)] text-white'
-                          : session.status === 'Early Bird Open'
-                          ? 'bg-[var(--color-terracotta)]/30 text-[var(--color-clay)]'
-                          : 'bg-[var(--color-sand)] text-[var(--color-stone)]'
-                      }`}>
-                        {session.status}
-                      </span>
+                      <span className="text-2xl text-[var(--color-earth-dark)]">{training.title}</span>
+                      {badgeLabel && (
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs ${
+                            badgeLabel === 'Early Bird'
+                              ? 'bg-[var(--color-terracotta)]/30 text-[var(--color-clay)]'
+                              : 'bg-[var(--color-sand)] text-[var(--color-stone)]'
+                          }`}
+                        >
+                          {badgeLabel}
+                        </span>
+                      )}
                     </div>
 
                     {/* Dates */}
@@ -101,22 +129,17 @@ export function SchedulePricing({ onNavigate }: SchedulePricingProps) {
                       <div className="flex items-start gap-3">
                         <Calendar size={18} className="text-[var(--color-clay)] mt-0.5 flex-shrink-0" />
                         <div>
-                          <div className="text-sm text-[var(--color-stone)]">Start Date</div>
-                          <div className="text-[var(--color-earth-dark)]">{session.startDate}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <Calendar size={18} className="text-[var(--color-clay)] mt-0.5 flex-shrink-0" />
-                        <div>
-                          <div className="text-sm text-[var(--color-stone)]">End Date</div>
-                          <div className="text-[var(--color-earth-dark)]">{session.endDate}</div>
+                          <div className="text-sm text-[var(--color-stone)]">Dates</div>
+                          <div className="text-[var(--color-earth-dark)]">
+                            {formatDateRange(training.starts_at, training.ends_at)}
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-start gap-3">
                         <Clock size={18} className="text-[var(--color-clay)] mt-0.5 flex-shrink-0" />
                         <div>
                           <div className="text-sm text-[var(--color-stone)]">Schedule</div>
-                          <div className="text-[var(--color-earth-dark)] text-sm">Sat-Sun, {session.time}</div>
+                          <div className="text-[var(--color-earth-dark)] text-sm">Mon-Sat</div>
                         </div>
                       </div>
                     </div>
@@ -147,45 +170,62 @@ export function SchedulePricing({ onNavigate }: SchedulePricingProps) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {pricingPackages.map((pkg, index) => (
-                <div
-                  key={index}
-                  className={`bg-white rounded-lg p-8 shadow-lg transition-all duration-300 relative ${
-                    pkg.highlighted
-                      ? 'ring-2 ring-[var(--color-sage)] md:-translate-y-2 hover:shadow-2xl'
-                      : 'hover:shadow-xl'
-                  }`}
-                >
-                  {/* Badge */}
-                  {pkg.badge && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                      <span className="inline-block px-4 py-1 bg-[var(--color-clay)] text-white text-xs rounded-full shadow-lg">
-                        {pkg.badge}
+              {/* Early Bird */}
+              {earlyBirdTraining?.early_bird_price != null && (
+                <div className="bg-white rounded-lg p-8 shadow-lg transition-all duration-300 relative ring-2 ring-[var(--color-sage)] md:-translate-y-2 hover:shadow-2xl">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className="inline-block px-4 py-1 bg-[var(--color-sage)] text-white text-xs rounded-full shadow-lg">
+                      Best Value
+                    </span>
+                  </div>
+
+                  <h3 className="mb-2 text-center text-[var(--color-earth-dark)]">Early Bird</h3>
+
+                  {standardTraining && earlyBirdTraining.id !== standardTraining.id && (
+                    <div className="text-center mb-3">
+                      <span className="inline-block px-3 py-1 rounded-full text-xs bg-[var(--color-sand)] text-[var(--color-stone)]">
+                        For {formatSessionLabel(earlyBirdTraining.starts_at)} Session
                       </span>
                     </div>
                   )}
 
-                  {/* Package Name */}
-                  <h3 className="mb-2 text-center text-[var(--color-earth-dark)]">{pkg.name}</h3>
-
-                  {/* Price */}
                   <div className="text-center mb-4">
                     <div className="flex items-center justify-center gap-2">
-                      {pkg.originalPrice && (
-                        <span className="text-xl text-[var(--color-stone)] line-through">{pkg.originalPrice}</span>
+                      {earlyBirdTraining.price != null && (
+                        <span className="text-lg text-[var(--color-stone)]/70 line-through decoration-[var(--color-stone)]/40 decoration-1">
+                          {formatMoney(earlyBirdTraining.price)}
+                        </span>
                       )}
-                      <span className="text-4xl text-[var(--color-earth-dark)]">{pkg.price}</span>
+                      <span className="text-4xl text-[var(--color-earth-dark)]">
+                        {formatMoney(earlyBirdTraining.early_bird_price)}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Description */}
                   <p className="text-sm text-[var(--color-stone)] text-center mb-6 h-12">
-                    {pkg.description}
+                    Save{' '}
+                    {earlyBirdTraining.price != null
+                      ? formatMoney(earlyBirdTraining.price - earlyBirdTraining.early_bird_price)
+                      : ''}{' '}
+                    when you register before{' '}
+                    {earlyBirdTraining.early_bird_deadline
+                      ? new Date(earlyBirdTraining.early_bird_deadline).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })
+                      : 'the deadline'}
+                    .
                   </p>
 
-                  {/* Features */}
                   <div className="space-y-3 mb-6">
-                    {pkg.features.map((feature, idx) => (
+                    {[
+                      'Complete 200-hour program',
+                      'All training materials included',
+                      'Yoga Alliance certification',
+                      'Lifetime alumni support',
+                      'Course manual & textbooks',
+                    ].map((feature, idx) => (
                       <div key={idx} className="flex items-start gap-3">
                         <Check size={18} className="text-[var(--color-sage)] mt-0.5 flex-shrink-0" />
                         <span className="text-sm text-[var(--color-stone)]">{feature}</span>
@@ -193,15 +233,107 @@ export function SchedulePricing({ onNavigate }: SchedulePricingProps) {
                     ))}
                   </div>
 
-                  {/* Divider */}
                   <div className="border-t border-[var(--color-sand)] my-6" />
 
-                  {/* Additional Info */}
-                  <div className="text-center text-xs text-[var(--color-stone)]">
-                    Non-refundable $500 deposit required
-                  </div>
+                  <button
+                    disabled={!earlyBirdTraining}
+                    onClick={() => earlyBirdTraining && setSelectedTraining(earlyBirdTraining)}
+                    className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] disabled:opacity-50 disabled:hover:bg-[var(--color-sage)] text-white py-3 rounded-lg transition-all duration-300"
+                  >
+                    View Details
+                  </button>
                 </div>
-              ))}
+              )}
+
+              {/* Standard */}
+              <div className="bg-white rounded-lg p-8 shadow-lg transition-all duration-300 relative hover:shadow-xl">
+                <h3 className="mb-2 text-center text-[var(--color-earth-dark)]">Standard</h3>
+
+                <div className="text-center mb-4">
+                  <span className="text-4xl text-[var(--color-earth-dark)]">
+                    {formatMoney(standardTraining?.price ?? null)}
+                  </span>
+                </div>
+
+                <p className="text-sm text-[var(--color-stone)] text-center mb-6 h-12">
+                  Full tuition for the teacher training program.
+                </p>
+
+                <div className="space-y-3 mb-6">
+                  {[
+                    'Complete 200-hour program',
+                    'All training materials included',
+                    'Yoga Alliance certification',
+                    'Lifetime alumni support',
+                    'Course manual & textbooks',
+                  ].map((feature, idx) => (
+                    <div key={idx} className="flex items-start gap-3">
+                      <Check size={18} className="text-[var(--color-sage)] mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-[var(--color-stone)]">{feature}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="border-t border-[var(--color-sand)] my-6" />
+
+                <button
+                  disabled={!standardTraining}
+                  onClick={() => standardTraining && setSelectedTraining(standardTraining)}
+                  className="w-full bg-[var(--color-earth-dark)] hover:bg-[var(--color-clay)] disabled:opacity-50 disabled:hover:bg-[var(--color-earth-dark)] text-white py-3 rounded-lg transition-all duration-300"
+                >
+                  View Details
+                </button>
+              </div>
+
+              {/* Payment Plan */}
+              <div className="bg-white rounded-lg p-8 shadow-lg transition-all duration-300 relative hover:shadow-xl">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <span className="inline-block px-4 py-1 bg-[var(--color-terracotta)] text-white text-xs rounded-full shadow-lg">
+                    Flexible
+                  </span>
+                </div>
+
+                <h3 className="mb-2 text-center text-[var(--color-earth-dark)]">Payment Plan</h3>
+
+                <div className="text-center mb-4">
+                  <span className="text-4xl text-[var(--color-earth-dark)]">
+                    {formatMoney(paymentPlanTotal)}
+                  </span>
+                </div>
+
+                <p className="text-sm text-[var(--color-stone)] text-center mb-6 h-12">
+                  {paymentPlanMonthly != null
+                    ? `4 monthly installments of ${formatMoney(paymentPlanMonthly)}`
+                    : 'Installment options available'}
+                </p>
+
+                <div className="space-y-3 mb-6">
+                  {[
+                    'Complete 200-hour program',
+                    'All training materials included',
+                    'Yoga Alliance certification',
+                    'Lifetime alumni support',
+                    paymentPlanMonthly != null
+                      ? `4 monthly installments of ${formatMoney(paymentPlanMonthly)}`
+                      : '4 monthly installments',
+                  ].map((feature, idx) => (
+                    <div key={idx} className="flex items-start gap-3">
+                      <Check size={18} className="text-[var(--color-sage)] mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-[var(--color-stone)]">{feature}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="border-t border-[var(--color-sand)] my-6" />
+
+                <button
+                  disabled={!standardTraining}
+                  onClick={() => standardTraining && setSelectedTraining(standardTraining)}
+                  className="w-full bg-[var(--color-earth-dark)] hover:bg-[var(--color-clay)] disabled:opacity-50 disabled:hover:bg-[var(--color-earth-dark)] text-white py-3 rounded-lg transition-all duration-300"
+                >
+                  View Details
+                </button>
+              </div>
             </div>
 
             {/* Additional Info */}
@@ -220,7 +352,6 @@ export function SchedulePricing({ onNavigate }: SchedulePricingProps) {
         <TrainingDetailModal
           training={selectedTraining}
           onClose={() => setSelectedTraining(null)}
-          onNavigate={onNavigate}
         />
       )}
     </>

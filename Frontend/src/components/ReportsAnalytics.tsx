@@ -1,6 +1,10 @@
-import { useState, useMemo } from 'react';
-import { TrendingUp, Users, Calendar as CalendarIcon } from 'lucide-react';
+"use client";
+
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { TrendingUp, Users, Calendar as CalendarIcon, ShieldAlert, Download, Loader2 } from 'lucide-react';
 import { MonthYearPicker } from './MonthYearPicker';
+import { useReportStats } from '../hooks/useReportStats';
+import { supabase } from '@/utils/supabase/client';
 import {
   BarChart,
   Bar,
@@ -17,81 +21,13 @@ import {
   Cell
 } from 'recharts';
 
-interface Booking {
-  id: string;
-  date: string;
-  timeSlot: string; // e.g., "09:00", "18:00"
-  memberName: string;
-  classType: string;
-  nationality: string;
-  attended: boolean;
-}
-
-// Mock booking data with various time slots, class types, and nationalities
-const mockBookings: Booking[] = [
-  // December 2024
-  { id: '1', date: '2024-12-01', timeSlot: '06:00', memberName: 'Sarah Thompson', classType: 'Vinyasa Flow', nationality: 'American', attended: true },
-  { id: '2', date: '2024-12-01', timeSlot: '18:00', memberName: 'Anna Petrova', classType: 'Hatha Yoga', nationality: 'Russian', attended: true },
-  { id: '3', date: '2024-12-02', timeSlot: '09:00', memberName: 'Somchai Wang', classType: 'Vinyasa Flow', nationality: 'Thai', attended: true },
-  { id: '4', date: '2024-12-02', timeSlot: '18:00', memberName: 'Elena Ivanov', classType: 'Yin Yoga', nationality: 'Russian', attended: true },
-  { id: '5', date: '2024-12-03', timeSlot: '06:00', memberName: 'Michael Chen', classType: 'Power Yoga', nationality: 'Chinese', attended: true },
-  { id: '6', date: '2024-12-03', timeSlot: '18:00', memberName: 'David Kim', classType: 'Vinyasa Flow', nationality: 'Korean', attended: true },
-  { id: '7', date: '2024-12-04', timeSlot: '09:00', memberName: 'Lisa Anderson', classType: 'Hatha Yoga', nationality: 'American', attended: true },
-  { id: '8', date: '2024-12-04', timeSlot: '18:00', memberName: 'Natasha Volkov', classType: 'Vinyasa Flow', nationality: 'Russian', attended: true },
-  { id: '9', date: '2024-12-05', timeSlot: '06:00', memberName: 'Emma Rodriguez', classType: 'Power Yoga', nationality: 'Spanish', attended: true },
-  { id: '10', date: '2024-12-05', timeSlot: '17:00', memberName: 'John Smith', classType: 'Yin Yoga', nationality: 'British', attended: true },
-  { id: '11', date: '2024-12-06', timeSlot: '09:00', memberName: 'Pranee Thai', classType: 'Vinyasa Flow', nationality: 'Thai', attended: true },
-  { id: '12', date: '2024-12-06', timeSlot: '18:00', memberName: 'Igor Petrov', classType: 'Hatha Yoga', nationality: 'Russian', attended: true },
-  { id: '13', date: '2024-12-07', timeSlot: '06:00', memberName: 'Jessica Lee', classType: 'Power Yoga', nationality: 'American', attended: true },
-  { id: '14', date: '2024-12-08', timeSlot: '09:00', memberName: 'Sophie Martin', classType: 'Vinyasa Flow', nationality: 'French', attended: true },
-  { id: '15', date: '2024-12-08', timeSlot: '18:00', memberName: 'Niran Patel', classType: 'Yin Yoga', nationality: 'Thai', attended: true },
-  { id: '16', date: '2024-12-09', timeSlot: '06:00', memberName: 'Maria Garcia', classType: 'Hatha Yoga', nationality: 'Spanish', attended: true },
-  { id: '17', date: '2024-12-10', timeSlot: '17:00', memberName: 'Kevin Zhang', classType: 'Vinyasa Flow', nationality: 'Chinese', attended: true },
-  { id: '18', date: '2024-12-10', timeSlot: '18:00', memberName: 'Olga Smirnova', classType: 'Power Yoga', nationality: 'Russian', attended: true },
-  { id: '19', date: '2024-12-11', timeSlot: '09:00', memberName: 'James Taylor', classType: 'Vinyasa Flow', nationality: 'American', attended: true },
-  { id: '20', date: '2024-12-12', timeSlot: '06:00', memberName: 'Anna Kowalski', classType: 'Hatha Yoga', nationality: 'Polish', attended: true },
-  { id: '21', date: '2024-12-12', timeSlot: '18:00', memberName: 'Suda Chaiya', classType: 'Yin Yoga', nationality: 'Thai', attended: true },
-  { id: '22', date: '2024-12-13', timeSlot: '09:00', memberName: 'Robert Martinez', classType: 'Vinyasa Flow', nationality: 'American', attended: true },
-  { id: '23', date: '2024-12-14', timeSlot: '17:00', memberName: 'Dmitry Volkov', classType: 'Power Yoga', nationality: 'Russian', attended: true },
-  { id: '24', date: '2024-12-15', timeSlot: '06:00', memberName: 'Amanda Wilson', classType: 'Vinyasa Flow', nationality: 'Australian', attended: true },
-  { id: '25', date: '2024-12-15', timeSlot: '18:00', memberName: 'Liam O\'Brien', classType: 'Hatha Yoga', nationality: 'Irish', attended: true },
-  
-  // Additional bookings for other months in 2024
-  { id: '26', date: '2024-11-15', timeSlot: '06:00', memberName: 'Sarah Thompson', classType: 'Vinyasa Flow', nationality: 'American', attended: true },
-  { id: '27', date: '2024-11-16', timeSlot: '18:00', memberName: 'Anna Petrova', classType: 'Hatha Yoga', nationality: 'Russian', attended: true },
-  { id: '28', date: '2024-11-17', timeSlot: '09:00', memberName: 'Somchai Wang', classType: 'Power Yoga', nationality: 'Thai', attended: true },
-  { id: '29', date: '2024-10-20', timeSlot: '18:00', memberName: 'Elena Ivanov', classType: 'Vinyasa Flow', nationality: 'Russian', attended: true },
-  { id: '30', date: '2024-10-21', timeSlot: '06:00', memberName: 'Michael Chen', classType: 'Yin Yoga', nationality: 'Chinese', attended: true },
-  { id: '31', date: '2024-09-10', timeSlot: '09:00', memberName: 'David Kim', classType: 'Vinyasa Flow', nationality: 'Korean', attended: true },
-  { id: '32', date: '2024-09-11', timeSlot: '18:00', memberName: 'Lisa Anderson', classType: 'Hatha Yoga', nationality: 'American', attended: true },
-  { id: '33', date: '2024-08-05', timeSlot: '17:00', memberName: 'Natasha Volkov', classType: 'Power Yoga', nationality: 'Russian', attended: true },
-  { id: '34', date: '2024-07-12', timeSlot: '06:00', memberName: 'Emma Rodriguez', classType: 'Vinyasa Flow', nationality: 'Spanish', attended: true },
-  { id: '35', date: '2024-06-18', timeSlot: '18:00', memberName: 'John Smith', classType: 'Yin Yoga', nationality: 'British', attended: true },
-  { id: '36', date: '2024-05-22', timeSlot: '09:00', memberName: 'Pranee Thai', classType: 'Vinyasa Flow', nationality: 'Thai', attended: true },
-  { id: '37', date: '2024-04-14', timeSlot: '06:00', memberName: 'Igor Petrov', classType: 'Hatha Yoga', nationality: 'Russian', attended: true },
-  { id: '38', date: '2024-03-08', timeSlot: '18:00', memberName: 'Jessica Lee', classType: 'Power Yoga', nationality: 'American', attended: true },
-  { id: '39', date: '2024-02-25', timeSlot: '09:00', memberName: 'Sophie Martin', classType: 'Vinyasa Flow', nationality: 'French', attended: true },
-  { id: '40', date: '2024-01-30', timeSlot: '17:00', memberName: 'Niran Patel', classType: 'Hatha Yoga', nationality: 'Thai', attended: true },
-];
-
 const COLORS = {
-  'Vinyasa Flow': '#6B9080',
-  'Hatha Yoga': '#A4B494',
-  'Power Yoga': '#D4A574',
-  'Yin Yoga': '#C89F9C',
-  'Restorative': '#E8B4B8'
-};
-
-const NATIONALITY_COLORS = {
-  'American': '#3B82F6',
-  'Russian': '#EF4444',
-  'Thai': '#10B981',
-  'Chinese': '#F59E0B',
-  'Korean': '#8B5CF6',
-  'British': '#EC4899',
-  'Spanish': '#F97316',
-  'French': '#6366F1',
-  'Other': '#9CA3AF'
+  cash: '#6B9080',
+  bank_transfer: '#A4B494',
+  credit_card: '#D4A574',
+  promptpay: '#C89F9C',
+  dropins: '#7A9FC1',
+  package: '#9C7AC1'
 };
 
 export function ReportsAnalytics() {
@@ -99,145 +35,103 @@ export function ReportsAnalytics() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [yearlyViewYear, setYearlyViewYear] = useState(new Date().getFullYear());
+  const [currentUserRole, setCurrentUserRole] = useState<string>('member');
+  const [roleLoading, setRoleLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const {
+    monthlyStats,
+    monthlyFinancials,
+    yearlyStats,
+    loading,
+    fetchMonthlyStats,
+    fetchMonthlyFinancials,
+    fetchYearlyStats
+  } = useReportStats();
 
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-  const handlePreviousMonth = () => {
-    if (selectedMonth === 0) {
-      setSelectedMonth(11);
-      setSelectedYear(selectedYear - 1);
-    } else {
-      setSelectedMonth(selectedMonth - 1);
-    }
-  };
-
-  const handleNextMonth = () => {
-    if (selectedMonth === 11) {
-      setSelectedMonth(0);
-      setSelectedYear(selectedYear + 1);
-    } else {
-      setSelectedMonth(selectedMonth + 1);
-    }
-  };
-
-  // Filter bookings for selected month
-  const monthlyBookings = useMemo(() => {
-    return mockBookings.filter(booking => {
-      const bookingDate = new Date(booking.date);
-      return (
-        bookingDate.getMonth() === selectedMonth &&
-        bookingDate.getFullYear() === selectedYear &&
-        booking.attended
-      );
-    });
-  }, [selectedMonth, selectedYear]);
-
-  // Filter bookings for selected year
-  const yearlyBookings = useMemo(() => {
-    return mockBookings.filter(booking => {
-      const bookingDate = new Date(booking.date);
-      return bookingDate.getFullYear() === yearlyViewYear && booking.attended;
-    });
-  }, [yearlyViewYear]);
-
-  // Chart 1: Peak Hours (Monthly)
-  const peakHoursData = useMemo(() => {
-    const timeSlotCounts: { [key: string]: number } = {};
-    
-    monthlyBookings.forEach(booking => {
-      timeSlotCounts[booking.timeSlot] = (timeSlotCounts[booking.timeSlot] || 0) + 1;
-    });
-
-    return Object.entries(timeSlotCounts)
-      .map(([timeSlot, count]) => ({
-        timeSlot,
-        attendees: count
-      }))
-      .sort((a, b) => a.timeSlot.localeCompare(b.timeSlot));
-  }, [monthlyBookings]);
-
-  // Chart 2: Class Popularity (Monthly)
-  const classPopularityData = useMemo(() => {
-    const classTypeCounts: { [key: string]: number } = {};
-    
-    monthlyBookings.forEach(booking => {
-      classTypeCounts[booking.classType] = (classTypeCounts[booking.classType] || 0) + 1;
-    });
-
-    const total = monthlyBookings.length;
-
-    return Object.entries(classTypeCounts).map(([classType, count]) => ({
-      name: classType,
-      value: count,
-      percentage: ((count / total) * 100).toFixed(1)
-    }));
-  }, [monthlyBookings]);
-
-  // Chart 3: Nationality Trends (Yearly)
-  const nationalityTrendsData = useMemo(() => {
-    // Group by month and nationality
-    const monthlyNationalities: { [key: number]: { [key: string]: number } } = {};
-
-    yearlyBookings.forEach(booking => {
-      const month = new Date(booking.date).getMonth();
-      if (!monthlyNationalities[month]) {
-        monthlyNationalities[month] = {};
+  // RBAC: Fetch current user's role
+  const fetchUserRole = useCallback(async () => {
+    try {
+      setRoleLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setCurrentUserRole('member');
+        return;
       }
-      monthlyNationalities[month][booking.nationality] = 
-        (monthlyNationalities[month][booking.nationality] || 0) + 1;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      if (profile) {
+        setCurrentUserRole(profile.role);
+      }
+    } catch (error) {
+      console.error('Error fetching user role:', error);
+      setCurrentUserRole('member');
+    } finally {
+      setRoleLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUserRole();
+  }, [fetchUserRole]);
+
+  useEffect(() => {
+    // RPCs typically expect month 1-12. UI state is 0-11.
+    const monthForRpc = selectedMonth + 1;
+    fetchMonthlyStats(selectedYear, monthForRpc);
+    fetchMonthlyFinancials(selectedYear, monthForRpc);
+  }, [fetchMonthlyFinancials, fetchMonthlyStats, selectedMonth, selectedYear]);
+
+  useEffect(() => {
+    fetchYearlyStats(yearlyViewYear);
+  }, [fetchYearlyStats, yearlyViewYear]);
+
+  const paymentBreakdownData = useMemo(() => {
+    const pb = monthlyFinancials?.payment_breakdown;
+    if (!pb) return [];
+
+    return [
+      { method: 'Cash', amount: pb.cash ?? 0, key: 'cash' },
+      { method: 'Bank', amount: pb.bank_transfer ?? 0, key: 'bank_transfer' },
+      { method: 'Card', amount: pb.credit_card ?? 0, key: 'credit_card' },
+      { method: 'PromptPay', amount: pb.promptpay ?? 0, key: 'promptpay' }
+    ].filter((x) => (x.amount ?? 0) > 0);
+  }, [monthlyFinancials]);
+
+  const bookingTypeData = useMemo(() => {
+    const total = monthlyStats?.total_bookings ?? 0;
+    const dropins = monthlyStats?.total_dropins ?? 0;
+    const packageBookings = monthlyStats?.total_package_bookings ?? Math.max(0, total - dropins);
+    if (total <= 0) return [];
+
+    const mk = (name: string, value: number, colorKey: keyof typeof COLORS) => ({
+      name,
+      value,
+      percentage: total > 0 ? ((value / total) * 100).toFixed(1) : '0.0',
+      colorKey
     });
 
-    // Get top 5 nationalities
-    const nationalityCounts: { [key: string]: number } = {};
-    yearlyBookings.forEach(booking => {
-      nationalityCounts[booking.nationality] = (nationalityCounts[booking.nationality] || 0) + 1;
-    });
+    return [
+      mk('Drop-ins', dropins, 'dropins'),
+      mk('Packages', packageBookings, 'package')
+    ].filter((x) => x.value > 0);
+  }, [monthlyStats]);
 
-    const topNationalities = Object.entries(nationalityCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([nationality]) => nationality);
-
-    // Create data for each month
-    return monthNames.map((month, index) => {
-      const dataPoint: any = { month: month.slice(0, 3) }; // Short month name
-      
-      topNationalities.forEach(nationality => {
-        dataPoint[nationality] = monthlyNationalities[index]?.[nationality] || 0;
-      });
-
-      return dataPoint;
-    });
-  }, [yearlyBookings]);
-
-  // Get top nationalities for the line chart
-  const topNationalities = useMemo(() => {
-    const nationalityCounts: { [key: string]: number } = {};
-    yearlyBookings.forEach(booking => {
-      nationalityCounts[booking.nationality] = (nationalityCounts[booking.nationality] || 0) + 1;
-    });
-
-    return Object.entries(nationalityCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([nationality]) => nationality);
-  }, [yearlyBookings]);
-
-  // Chart 4: Most Popular Classes (Yearly)
-  const popularClassesYearlyData = useMemo(() => {
-    const classTypeCounts: { [key: string]: number } = {};
-    
-    yearlyBookings.forEach(booking => {
-      classTypeCounts[booking.classType] = (classTypeCounts[booking.classType] || 0) + 1;
-    });
-
-    return Object.entries(classTypeCounts)
-      .map(([classType, count]) => ({
-        classType,
-        bookings: count
-      }))
-      .sort((a, b) => b.bookings - a.bookings);
-  }, [yearlyBookings]);
+  const yearlyRevenueData = useMemo(() => {
+    const breakdown = yearlyStats?.monthly_breakdown ?? [];
+    return breakdown.map((m) => ({
+      month: monthNames[(m.month ?? 1) - 1]?.slice(0, 3) ?? String(m.month),
+      revenue: m.revenue ?? 0,
+      bookings: m.bookings ?? 0
+    }));
+  }, [monthNames, yearlyStats]);
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
@@ -245,7 +139,7 @@ export function ReportsAnalytics() {
         <div className="bg-white p-4 rounded-lg shadow-xl border border-[var(--color-sand)]">
           <p className="text-sm text-[var(--color-earth-dark)]">{payload[0].name}</p>
           <p className="text-lg text-[var(--color-sage)]">
-            {payload[0].value} attendees
+            {payload[0].value}
           </p>
         </div>
       );
@@ -259,13 +153,124 @@ export function ReportsAnalytics() {
         <div className="bg-white p-4 rounded-lg shadow-xl border border-[var(--color-sand)]">
           <p className="text-sm text-[var(--color-earth-dark)]">{payload[0].name}</p>
           <p className="text-lg text-[var(--color-sage)]">
-            {payload[0].value} bookings ({payload[0].payload.percentage}%)
+            {payload[0].value} ({payload[0].payload.percentage}%)
           </p>
         </div>
       );
     }
     return null;
   };
+
+  const handleExportCSV = async () => {
+    try {
+      setIsExporting(true);
+      
+      // Determine period for filename and data fetch
+      const month = monthNames[selectedMonth];
+      const year = activeTab === 'monthly' ? selectedYear : yearlyViewYear;
+      const period = activeTab === 'monthly' ? `${month}_${year}` : `${year}`;
+      const filename = `financial-report-${period.toLowerCase()}.csv`;
+      
+      // Fetch payment data for the selected period
+      const startDate = activeTab === 'monthly'
+        ? new Date(selectedYear, selectedMonth, 1)
+        : new Date(year, 0, 1);
+      const endDate = activeTab === 'monthly'
+        ? new Date(selectedYear, selectedMonth + 1, 0)
+        : new Date(year, 11, 31);
+      
+      // Fetch bookings with user profiles and guest info
+      const { data: bookingsData, error } = await supabase
+        .from('bookings')
+        .select('id, created_at, amount_paid, amount_due, payment_status, payment_method, user_id, guest_name, guest_contact, kind')
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString())
+        .neq('status', 'cancelled');
+      
+      if (error) throw error;
+      
+      // Fetch user profiles for member bookings
+      const userIds = [...new Set((bookingsData || []).map((b: any) => b.user_id).filter(Boolean))];
+      let usersMap: Record<string, any> = {};
+      
+      if (userIds.length > 0) {
+        const { data: usersData } = await supabase
+          .from('profiles')
+          .select('id, full_name, phone')
+          .in('id', userIds);
+        
+        (usersData || []).forEach((u: any) => {
+          usersMap[u.id] = u;
+        });
+      }
+      
+      // CSV Headers
+      const headers = 'Date,Name,Type,Amount Paid,Amount Due,Payment Method,Payment Status,Contact\n';
+      
+      // CSV Rows
+      const rows = (bookingsData || []).map((booking: any) => {
+        const date = new Date(booking.created_at).toLocaleDateString();
+        const name = booking.guest_name || usersMap[booking.user_id]?.full_name || 'Unknown';
+        const type = booking.guest_name ? 'Guest' : 'Member';
+        const amountPaid = booking.amount_paid || 0;
+        const amountDue = booking.amount_due || 0;
+        const method = booking.payment_method || 'N/A';
+        const status = booking.payment_status || 'unpaid';
+        const contact = booking.guest_contact || usersMap[booking.user_id]?.phone || '';
+        
+        return `"${date}","${name}","${type}","${amountPaid}","${amountDue}","${method}","${status}","${contact}"`;
+      }).join('\n');
+      
+      const csvData = headers + rows;
+      
+      // Create and download CSV file
+      const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      // toast.success(`CSV exported successfully: ${filename}`);
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+      // toast.error('Failed to export CSV');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // RBAC: Show loading state (AFTER all hooks)
+  if (roleLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-[var(--color-stone)]">Loading...</div>
+      </div>
+    );
+  }
+
+  // RBAC: Show unauthorized message for non-admins (AFTER all hooks)
+  if (currentUserRole !== 'admin') {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center max-w-md">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-red-100 flex items-center justify-center">
+            <ShieldAlert size={40} className="text-red-600" />
+          </div>
+          <h2 className="text-2xl text-[var(--color-earth-dark)] mb-3">Access Denied</h2>
+          <p className="text-[var(--color-stone)] mb-6">
+            This page is restricted to administrators only. Please contact your system administrator if you believe you should have access.
+          </p>
+          <div className="text-sm text-[var(--color-stone)]">
+            Current role: <span className="font-medium text-[var(--color-earth-dark)]">{currentUserRole}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8">
@@ -313,37 +318,56 @@ export function ReportsAnalytics() {
               onYearChange={setSelectedYear}
             />
 
+            {/* Export CSV Button */}
+            <button
+              onClick={handleExportCSV}
+              disabled={isExporting}
+              className="bg-white hover:bg-[var(--color-cream)] text-[var(--color-earth-dark)] border border-[var(--color-sand)] px-4 py-2 rounded-lg flex items-center gap-2 transition-all duration-300 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isExporting ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  <span className="text-sm">Exporting...</span>
+                </>
+              ) : (
+                <>
+                  <Download size={18} />
+                  <span className="text-sm">Export CSV</span>
+                </>
+              )}
+            </button>
+
             {/* Quick Stats */}
             <div className="flex gap-6">
               <div className="bg-white rounded-lg shadow-md px-6 py-3">
                 <div className="text-sm text-[var(--color-stone)]">Total Bookings</div>
-                <div className="text-2xl text-[var(--color-earth-dark)]">{monthlyBookings.length}</div>
+                <div className="text-2xl text-[var(--color-earth-dark)]">{loading ? '—' : (monthlyStats?.total_bookings ?? 0)}</div>
               </div>
               <div className="bg-white rounded-lg shadow-md px-6 py-3">
-                <div className="text-sm text-[var(--color-stone)]">Unique Classes</div>
-                <div className="text-2xl text-[var(--color-earth-dark)]">{classPopularityData.length}</div>
+                <div className="text-sm text-[var(--color-stone)]">Revenue</div>
+                <div className="text-2xl text-[var(--color-earth-dark)]">{loading ? '—' : `฿${Number(monthlyFinancials?.total_revenue ?? 0).toLocaleString()}`}</div>
               </div>
             </div>
           </div>
 
-          {/* Chart 1: Peak Hours */}
+          {/* Chart 1: Payment Breakdown */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
                 <TrendingUp size={20} className="text-blue-600" />
               </div>
               <div>
-                <h2 className="text-xl text-[var(--color-earth-dark)]">Peak Hours</h2>
-                <p className="text-sm text-[var(--color-stone)]">Most popular time slots for classes</p>
+                <h2 className="text-xl text-[var(--color-earth-dark)]">Payment Breakdown</h2>
+                <p className="text-sm text-[var(--color-stone)]">Revenue by payment method</p>
               </div>
             </div>
             
-            {peakHoursData.length > 0 ? (
+            {paymentBreakdownData.length > 0 ? (
               <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={peakHoursData}>
+                <BarChart data={paymentBreakdownData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E8DFD8" />
                   <XAxis 
-                    dataKey="timeSlot" 
+                    dataKey="method" 
                     stroke="#8B7F76"
                     style={{ fontSize: '14px' }}
                   />
@@ -352,7 +376,7 @@ export function ReportsAnalytics() {
                     style={{ fontSize: '14px' }}
                   />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="attendees" fill="#6B9080" radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="amount" fill="#6B9080" radius={[8, 8, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -362,24 +386,24 @@ export function ReportsAnalytics() {
             )}
           </div>
 
-          {/* Chart 2: Class Popularity */}
+          {/* Chart 2: Booking Breakdown */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
                 <CalendarIcon size={20} className="text-purple-600" />
               </div>
               <div>
-                <h2 className="text-xl text-[var(--color-earth-dark)]">Class Popularity</h2>
-                <p className="text-sm text-[var(--color-stone)]">Distribution of bookings by class type</p>
+                <h2 className="text-xl text-[var(--color-earth-dark)]">Booking Breakdown</h2>
+                <p className="text-sm text-[var(--color-stone)]">Drop-ins vs package bookings</p>
               </div>
             </div>
 
-            {classPopularityData.length > 0 ? (
+            {bookingTypeData.length > 0 ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <ResponsiveContainer width="100%" height={350}>
                   <PieChart>
                     <Pie
-                      data={classPopularityData}
+                      data={bookingTypeData}
                       cx="50%"
                       cy="50%"
                       labelLine={false}
@@ -388,8 +412,8 @@ export function ReportsAnalytics() {
                       fill="#8884d8"
                       dataKey="value"
                     >
-                      {classPopularityData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[entry.name as keyof typeof COLORS] || '#9CA3AF'} />
+                      {bookingTypeData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[entry.colorKey as keyof typeof COLORS] || '#9CA3AF'} />
                       ))}
                     </Pie>
                     <Tooltip content={<PieTooltip />} />
@@ -398,12 +422,12 @@ export function ReportsAnalytics() {
 
                 {/* Legend with actual numbers */}
                 <div className="flex flex-col justify-center space-y-3">
-                  {classPopularityData.map((item, index) => (
+                  {bookingTypeData.map((item, index) => (
                     <div key={index} className="flex items-center justify-between p-3 rounded-lg hover:bg-[var(--color-cream)] transition-colors">
                       <div className="flex items-center gap-3">
                         <div 
                           className="w-4 h-4 rounded"
-                          style={{ backgroundColor: COLORS[item.name as keyof typeof COLORS] || '#9CA3AF' }}
+                          style={{ backgroundColor: COLORS[item.colorKey as keyof typeof COLORS] || '#9CA3AF' }}
                         />
                         <span className="text-[var(--color-earth-dark)]">{item.name}</span>
                       </div>
@@ -441,30 +465,30 @@ export function ReportsAnalytics() {
             <div className="flex gap-6">
               <div className="bg-white rounded-lg shadow-md px-6 py-3">
                 <div className="text-sm text-[var(--color-stone)]">Annual Bookings</div>
-                <div className="text-2xl text-[var(--color-earth-dark)]">{yearlyBookings.length}</div>
+                <div className="text-2xl text-[var(--color-earth-dark)]">{loading ? '—' : (yearlyStats?.total_bookings ?? 0)}</div>
               </div>
               <div className="bg-white rounded-lg shadow-md px-6 py-3">
-                <div className="text-sm text-[var(--color-stone)]">Nationalities</div>
-                <div className="text-2xl text-[var(--color-earth-dark)]">{topNationalities.length}</div>
+                <div className="text-sm text-[var(--color-stone)]">Annual Revenue</div>
+                <div className="text-2xl text-[var(--color-earth-dark)]">{loading ? '—' : `฿${Number(yearlyStats?.total_revenue ?? 0).toLocaleString()}`}</div>
               </div>
             </div>
           </div>
 
-          {/* Chart 3: Nationality Trends */}
+          {/* Chart 3: Monthly Revenue Trend */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
                 <Users size={20} className="text-green-600" />
               </div>
               <div>
-                <h2 className="text-xl text-[var(--color-earth-dark)]">Nationality Trends</h2>
-                <p className="text-sm text-[var(--color-stone)]">Track visitor patterns by nationality throughout the year</p>
+                <h2 className="text-xl text-[var(--color-earth-dark)]">Monthly Revenue Trend</h2>
+                <p className="text-sm text-[var(--color-stone)]">Revenue performance throughout the year</p>
               </div>
             </div>
 
-            {nationalityTrendsData.length > 0 && topNationalities.length > 0 ? (
+            {yearlyRevenueData.length > 0 ? (
               <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={nationalityTrendsData}>
+                <LineChart data={yearlyRevenueData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E8DFD8" />
                   <XAxis 
                     dataKey="month" 
@@ -484,17 +508,14 @@ export function ReportsAnalytics() {
                     }}
                   />
                   <Legend />
-                  {topNationalities.map((nationality, index) => (
-                    <Line
-                      key={nationality}
-                      type="monotone"
-                      dataKey={nationality}
-                      stroke={NATIONALITY_COLORS[nationality as keyof typeof NATIONALITY_COLORS] || NATIONALITY_COLORS.Other}
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
-                    />
-                  ))}
+                  <Line
+                    type="monotone"
+                    dataKey="revenue"
+                    stroke="#6B9080"
+                    strokeWidth={2}
+                    dot={{ r: 4 }}
+                    activeDot={{ r: 6 }}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -504,33 +525,30 @@ export function ReportsAnalytics() {
             )}
           </div>
 
-          {/* Chart 4: Most Popular Classes of the Year */}
+          {/* Chart 4: Monthly Bookings */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
                 <TrendingUp size={20} className="text-orange-600" />
               </div>
               <div>
-                <h2 className="text-xl text-[var(--color-earth-dark)]">Most Popular Classes of {yearlyViewYear}</h2>
-                <p className="text-sm text-[var(--color-stone)]">Ranking by total annual bookings</p>
+                <h2 className="text-xl text-[var(--color-earth-dark)]">Monthly Bookings ({yearlyViewYear})</h2>
+                <p className="text-sm text-[var(--color-stone)]">Total bookings per month</p>
               </div>
             </div>
 
-            {popularClassesYearlyData.length > 0 ? (
+            {yearlyRevenueData.length > 0 ? (
               <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={popularClassesYearlyData} layout="vertical">
+                <BarChart data={yearlyRevenueData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E8DFD8" />
                   <XAxis 
-                    type="number"
+                    dataKey="month"
                     stroke="#8B7F76"
                     style={{ fontSize: '14px' }}
                   />
                   <YAxis 
-                    dataKey="classType" 
-                    type="category"
                     stroke="#8B7F76"
                     style={{ fontSize: '14px' }}
-                    width={120}
                   />
                   <Tooltip
                     contentStyle={{ 
@@ -540,11 +558,7 @@ export function ReportsAnalytics() {
                       padding: '12px'
                     }}
                   />
-                  <Bar dataKey="bookings" radius={[0, 8, 8, 0]}>
-                    {popularClassesYearlyData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[entry.classType as keyof typeof COLORS] || '#9CA3AF'} />
-                    ))}
-                  </Bar>
+                  <Bar dataKey="bookings" fill="#D4A574" radius={[8, 8, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (

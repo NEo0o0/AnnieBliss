@@ -1,3 +1,5 @@
+ "use client";
+
 import { X, Clock, Calendar, MapPin, DollarSign, Users, Tag } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
@@ -6,6 +8,7 @@ interface EventDetailModalProps {
     id: number;
     title: string;
     image: string;
+    starts_at: string;
     date: string;
     time: string;
     price: string;
@@ -20,6 +23,8 @@ interface EventDetailModalProps {
 export function EventDetailModal({ event, onClose, onNavigate }: EventDetailModalProps) {
   const { isLoggedIn } = useApp();
 
+  const isPastEvent = new Date(event.starts_at) < new Date();
+
   const handleBooking = () => {
     if (isLoggedIn) {
       alert(`Successfully registered for ${event.title}! Check your email for confirmation.`);
@@ -29,7 +34,7 @@ export function EventDetailModal({ event, onClose, onNavigate }: EventDetailModa
 
   const handleLoginRedirect = () => {
     onClose();
-    onNavigate('admin');
+    onNavigate('login');
   };
 
   const handleContactRedirect = () => {
@@ -140,7 +145,15 @@ export function EventDetailModal({ event, onClose, onNavigate }: EventDetailModa
 
           {/* Booking Section */}
           <div className="border-t border-[var(--color-sand)] pt-6">
-            {isLoggedIn ? (
+            {isPastEvent ? (
+              <button
+                disabled
+                className="w-full bg-[var(--color-stone)] text-white py-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg cursor-not-allowed opacity-80"
+              >
+                <Users size={20} />
+                <span className="text-lg">Registration Closed</span>
+              </button>
+            ) : isLoggedIn ? (
               <button
                 onClick={handleBooking}
                 className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white py-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105"

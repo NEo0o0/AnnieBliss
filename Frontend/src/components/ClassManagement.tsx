@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from 'react';
 import { Plus, Edit2, Trash2, Calendar, Sparkles } from 'lucide-react';
 import { useApp } from '../context/AppContext';

@@ -1,41 +1,43 @@
-import { ArrowRight } from 'lucide-react';
+ "use client";
+
+import { ArrowRight, Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import { useClassTypes } from '../hooks';
+import { ClassTemplateDetailsModal } from './ClassTemplateDetailsModal';
+import type { Tables } from '../types/database.types';
+
+type ClassType = Tables<'class_types'>;
 
 interface ClassTypesProps {
   onNavigate?: (page: string) => void;
 }
 
-const classTypes = [
-  {
-    level: 'Basic',
-    title: 'Beginner Yoga',
-    image: 'https://images.unsplash.com/photo-1758274535024-be3faa30f507?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiZWdpbm5lciUyMHlvZ2ElMjBjbGFzc3xlbnwxfHx8fDE3NjY0OTE0OTV8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-    description: 'Perfect for those new to yoga. Learn foundational poses, basic breathwork, and gentle movements in a supportive environment.',
-    duration: '60 minutes',
-    focus: 'Fundamentals, Alignment, Breath',
-  },
-  {
-    level: 'Intermediate',
-    title: 'Intermediate Flow',
-    image: 'https://images.unsplash.com/photo-1582106316415-d02d4d0e9066?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbnRlcm1lZGlhdGUlMjB5b2dhJTIwZmxvd3xlbnwxfHx8fDE3NjY0OTE0OTV8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-    description: 'Build strength and flexibility with dynamic sequences. Explore deeper variations and cultivate mindful flow between poses.',
-    duration: '75 minutes',
-    focus: 'Vinyasa Flow, Strength, Balance',
-  },
-  {
-    level: 'Advanced',
-    title: 'Advanced Practice',
-    image: 'https://images.unsplash.com/photo-1766069339604-d4177198af7e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZHZhbmNlZCUyMHlvZ2ElMjBwb3NlfGVufDF8fHx8MTc2NjQ5MTQ5NXww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-    description: 'Challenge your practice with complex transitions, inversions, and advanced asanas. Requires solid foundation and body awareness.',
-    duration: '90 minutes',
-    focus: 'Inversions, Arm Balances, Advanced Asanas',
-  },
-];
-
 export function ClassTypes({ onNavigate }: ClassTypesProps) {
-  const handleViewDetails = () => {
-    if (onNavigate) {
-      onNavigate('class-detail');
+  const { classTypes, loading, error } = useClassTypes();
+  const [selectedTemplate, setSelectedTemplate] = useState<ClassType | null>(null);
+
+  const handleViewDetails = (classType: ClassType) => {
+    setSelectedTemplate(classType);
+  };
+
+  const getLevelBadgeColor = (level: string | null) => {
+    if (!level) return 'bg-[var(--color-sand)]';
+    const lowerLevel = level.toLowerCase();
+    if (lowerLevel.includes('beginner') || lowerLevel.includes('basic')) {
+      return 'bg-[var(--color-sage)]/20 text-[var(--color-sage)]';
     }
+    if (lowerLevel.includes('intermediate')) {
+      return 'bg-[var(--color-terracotta)]/20 text-[var(--color-terracotta)]';
+    }
+    if (lowerLevel.includes('advanced')) {
+      return 'bg-[var(--color-clay)]/20 text-[var(--color-clay)]';
+    }
+    return 'bg-[var(--color-sand)]';
+  };
+
+  const formatDuration = (minutes: number | null) => {
+    if (!minutes) return '60 minutes';
+    return `${minutes} minutes`;
   };
 
   return (
@@ -48,57 +50,119 @@ export function ClassTypes({ onNavigate }: ClassTypesProps) {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {classTypes.map((classType, index) => (
-            <div
-              key={index}
-              className="bg-white rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300"
-            >
-              {/* Thumbnail Image */}
-              <div className="relative h-64 overflow-hidden">
-                <img
-                  src={classType.image}
-                  alt={classType.title}
-                  className="w-full h-full object-cover hover:scale-110 transition-transform duration-500"
-                />
-                {/* Level Badge Overlay */}
-                <div className="absolute top-4 right-4 bg-white/95 px-4 py-2 rounded-full shadow-lg">
-                  <span className="text-[var(--color-earth-dark)]">{classType.level}</span>
+        {/* Loading State */}
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-20">
+            <Loader2 size={48} className="text-[var(--color-sage)] animate-spin mb-4" />
+            <p className="text-[var(--color-stone)]">Loading class types...</p>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && !loading && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center max-w-md mx-auto">
+            <p className="text-red-800">Failed to load class types. Please try again later.</p>
+          </div>
+        )}
+
+        {/* Class Types Grid */}
+        {!loading && !error && classTypes.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {classTypes.map((classType) => (
+              <div
+                key={classType.id}
+                className="bg-white rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300"
+                style={{
+                  borderTop: classType.color_code ? `4px solid ${classType.color_code}` : undefined
+                }}
+              >
+                {/* Thumbnail Image */}
+                <div className="relative h-64 overflow-hidden bg-[var(--color-sand)]">
+                  {(classType as any).image_url ? (
+                    <img
+                      src={(classType as any).image_url}
+                      alt={classType.title}
+                      className="w-full h-full object-cover hover:scale-110 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <span className="text-4xl text-[var(--color-stone)]/30">🧘</span>
+                    </div>
+                  )}
+                  {/* Level Badge Overlay */}
+                  {classType.level && (
+                    <div className={`absolute top-4 right-4 px-4 py-2 rounded-full shadow-lg ${getLevelBadgeColor(classType.level)}`}>
+                      <span className="font-medium">{classType.level}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Card Content */}
+                <div className="p-6">
+                  <h3 className="mb-3 text-[var(--color-earth-dark)]">{classType.title}</h3>
+                  <p className="text-[var(--color-stone)] mb-4 text-sm">
+                    {classType.description || 'A wonderful yoga class to enhance your practice.'}
+                  </p>
+
+                  {/* Class Details */}
+                  <div className="space-y-2 mb-6 pb-6 border-b border-[var(--color-sand)]">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-[var(--color-stone)]">Duration:</span>
+                      <span className="text-[var(--color-earth-dark)]">{formatDuration(classType.duration_minutes)}</span>
+                    </div>
+                    {classType.level && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-[var(--color-stone)]">Level:</span>
+                        <span className="text-[var(--color-earth-dark)]">{classType.level}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* View Details Button */}
+                  <button 
+                    onClick={() => handleViewDetails(classType)}
+                    className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white py-3 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 group"
+                  >
+                    View Details
+                    <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform duration-300" />
+                  </button>
                 </div>
               </div>
+            ))}
+          </div>
+        )}
 
-              {/* Card Content */}
-              <div className="p-6">
-                <h3 className="mb-3 text-[var(--color-earth-dark)]">{classType.title}</h3>
-                <p className="text-[var(--color-stone)] mb-4 text-sm">
-                  {classType.description}
-                </p>
-
-                {/* Class Details */}
-                <div className="space-y-2 mb-6 pb-6 border-b border-[var(--color-sand)]">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-[var(--color-stone)]">Duration:</span>
-                    <span className="text-[var(--color-earth-dark)]">{classType.duration}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-[var(--color-stone)]">Focus:</span>
-                    <span className="text-[var(--color-earth-dark)] text-right">{classType.focus}</span>
-                  </div>
-                </div>
-
-                {/* View Details Button */}
-                <button 
-                  onClick={handleViewDetails}
-                  className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white py-3 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 group"
-                >
-                  View Details
-                  <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform duration-300" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+        {/* No Class Types Available */}
+        {!loading && !error && classTypes.length === 0 && (
+          <div className="text-center py-20">
+            <div className="text-6xl mb-4">🧘</div>
+            <h3 className="mb-2 text-[var(--color-earth-dark)]">
+              No Class Types Available
+            </h3>
+            <p className="text-[var(--color-stone)]">
+              Check back soon for our class types!
+            </p>
+          </div>
+        )}
       </div>
+
+      {/* Class Template Details Modal */}
+      {selectedTemplate && (
+        <ClassTemplateDetailsModal
+          templateData={{
+            id: selectedTemplate.id,
+            title: selectedTemplate.title,
+            description: selectedTemplate.description,
+            long_description: (selectedTemplate as any).long_description || null,
+            level: selectedTemplate.level,
+            duration_minutes: selectedTemplate.duration_minutes,
+            default_price: selectedTemplate.default_price,
+            cover_image_url: (selectedTemplate as any).cover_image_url || null,
+            color_code: selectedTemplate.color_code,
+          }}
+          onClose={() => setSelectedTemplate(null)}
+        />
+      )}
     </section>
   );
 }

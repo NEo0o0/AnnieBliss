@@ -1,3 +1,5 @@
+"use client";
+
 import { createContext, useContext, useState, ReactNode } from 'react';
 
 // UI-friendly interfaces for mock data (not using strict DB types yet)

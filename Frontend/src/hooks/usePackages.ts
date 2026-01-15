@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase/client';
 import type { Tables, TablesInsert, TablesUpdate } from '../types/database.types';
@@ -11,11 +13,12 @@ type UserPackageInsert = TablesInsert<'user_packages'>;
 interface UsePackagesOptions {
   activeOnly?: boolean;
   autoFetch?: boolean;
+  initialPackages?: Package[];
 }
 
 export function usePackages(options: UsePackagesOptions = {}) {
-  const { activeOnly = true, autoFetch = true } = options;
-  const [packages, setPackages] = useState<Package[]>([]);
+  const { activeOnly = true, autoFetch = true, initialPackages } = options;
+  const [packages, setPackages] = useState<Package[]>(initialPackages ?? []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
@@ -24,20 +27,16 @@ export function usePackages(options: UsePackagesOptions = {}) {
       setLoading(true);
       setError(null);
 
-      let query = supabase
-        .from('packages')
-        .select('*')
-        .order('price', { ascending: true });
+      const params = new URLSearchParams();
+      params.set('activeOnly', activeOnly ? 'true' : 'false');
 
-      if (activeOnly) {
-        query = query.eq('is_active', true);
+      const response = await fetch(`/api/packages?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch packages (${response.status})`);
       }
 
-      const { data, error: fetchError } = await query;
-
-      if (fetchError) throw fetchError;
-
-      setPackages(data || []);
+      const json = (await response.json()) as { data: Package[] };
+      setPackages(json.data ?? []);
     } catch (err) {
       setError(err as Error);
       console.error('Error fetching packages:', err);

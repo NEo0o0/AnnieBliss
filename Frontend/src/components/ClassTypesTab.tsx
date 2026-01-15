@@ -1,7 +1,11 @@
+"use client";
+
 import { useState } from 'react';
 import { Plus, Edit2, Trash2, X, Check, Sparkles } from 'lucide-react';
 import { useClassTypes } from '../hooks';
 import type { Tables } from '../types/database.types';
+import { ConfirmationModal } from './ConfirmationModal';
+import { toast } from 'sonner';
 
 type ClassType = Tables<'class_types'>;
 
@@ -18,6 +22,12 @@ export function ClassTypesTab() {
     color_code: '#8CA899', // Default sage color
     default_price: 25.00
   });
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   const resetForm = () => {
     setFormData({
@@ -40,15 +50,17 @@ export function ClassTypesTab() {
       if (editingId) {
         const result = await updateClassType(editingId, formData);
         if (result.error) {
-          alert(`Error updating class type: ${result.error.message}`);
+          toast.error(`Error updating class type: ${result.error.message}`);
           return;
         }
+        toast.success('Class type updated successfully!');
       } else {
         const result = await createClassType(formData);
         if (result.error) {
-          alert(`Error creating class type: ${result.error.message}`);
+          toast.error(`Error creating class type: ${result.error.message}`);
           return;
         }
+        toast.success('Class type created successfully!');
       }
       resetForm();
     } finally {
@@ -69,13 +81,30 @@ export function ClassTypesTab() {
     setShowForm(true);
   };
 
-  const handleDelete = async (id: number) => {
-    if (confirm('Are you sure you want to delete this class type?')) {
-      const result = await deleteClassType(id);
-      if (result.error) {
-        alert(`Error deleting class type: ${result.error.message}`);
+  const handleDelete = async (id: number, title: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Class Type',
+      message: `Are you sure you want to delete "${title}"? This action cannot be undone.`,
+      onConfirm: async () => {
+        const result = await deleteClassType(id);
+        if (result.error) {
+          const errorMessage = result.error.message || '';
+          const errorCode = (result.error as any).code;
+          
+          if (errorCode === '23503' || errorMessage.includes('foreign key') || errorMessage.includes('violates')) {
+            toast.error(
+              `Cannot delete "${title}" because it is being used in existing classes or bookings. Please archive it instead or remove all references first.`,
+              { duration: 6000 }
+            );
+          } else {
+            toast.error(`Error deleting class type: ${errorMessage}`);
+          }
+        } else {
+          toast.success('Class type deleted successfully');
+        }
       }
-    }
+    });
   };
 
   const levelOptions = ['Beginner', 'Intermediate', 'Advanced', 'All Levels'];
@@ -154,7 +183,7 @@ export function ClassTypesTab() {
                       <Edit2 size={16} className="text-[var(--color-sage)]" />
                     </button>
                     <button
-                      onClick={() => handleDelete(classType.id)}
+                      onClick={() => handleDelete(classType.id, classType.title)}
                       className="p-2 hover:bg-red-50 rounded-lg transition-colors duration-300"
                     >
                       <Trash2 size={16} className="text-red-600" />
@@ -240,8 +269,11 @@ export function ClassTypesTab() {
                   </label>
                   <input
                     type="number"
-                    value={formData.duration_minutes}
-                    onChange={(e) => setFormData({ ...formData, duration_minutes: parseInt(e.target.value) })}
+                    value={formData.duration_minutes || ''}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      setFormData({ ...formData, duration_minutes: isNaN(val) ? 0 : val });
+                    }}
                     className="w-full px-4 py-3 rounded-lg border border-[var(--color-sand)] focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent transition-all duration-300"
                     min="15"
                     step="15"
@@ -284,8 +316,11 @@ export function ClassTypesTab() {
                 </label>
                 <input
                   type="number"
-                  value={formData.default_price}
-                  onChange={(e) => setFormData({ ...formData, default_price: parseFloat(e.target.value) })}
+                  value={formData.default_price || ''}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setFormData({ ...formData, default_price: isNaN(val) ? 0 : val });
+                  }}
                   className="w-full px-4 py-3 rounded-lg border border-[var(--color-sand)] focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent transition-all duration-300"
                   min="0"
                   step="0.01"
@@ -314,6 +349,17 @@ export function ClassTypesTab() {
           </div>
         </div>
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant="warning"
+        confirmText="Delete"
+      />
     </div>
   );
 }

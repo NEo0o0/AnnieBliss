@@ -1,5 +1,8 @@
+"use client";
+
 import { useState } from 'react';
 import { Mail, Lock, User, Phone, Eye, EyeOff, MessageCircle, Instagram, Facebook, Home } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '../hooks';
 import { supabase } from '../utils/supabase/client';
 import type { Tables } from '../types/database.types';
@@ -26,6 +29,7 @@ interface LoginRegisterProps {
 type ContactPlatform = 'line' | 'instagram' | 'facebook' | 'whatsapp';
 
 export function LoginRegister({ onLoginSuccess, onNavigateHome }: LoginRegisterProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
   const [showPassword, setShowPassword] = useState(false);
 
@@ -98,7 +102,8 @@ export function LoginRegister({ onLoginSuccess, onNavigateHome }: LoginRegisterP
       console.log('User:', data.user);
 
       // Fetch profile if not already included
-      let profile = data.profile;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let profile = (data as any)?.profile as Profile | null | undefined;
       if (!profile && data.user) {
         console.log('Fetching profile for user:', data.user.id);
         const { data: profileData } = await supabase
@@ -118,15 +123,14 @@ export function LoginRegister({ onLoginSuccess, onNavigateHome }: LoginRegisterP
           role: (profile.role || 'member') as 'member' | 'admin',
           phone: profile.phone || undefined,
           contactInfo: profile.contact_info || undefined,
-          contactPlatform: profile.contact_platform || undefined,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          contactPlatform: (profile as any).contact_platform || undefined,
         };
 
         console.log('Calling onLoginSuccess with:', userData);
         onLoginSuccess(userData);
         
-        // Force hard redirect to homepage (full page reload)
-        console.log('Redirecting to homepage...');
-        window.location.href = '/';
+        router.push('/profile');
       } else {
         console.error('Missing user or profile data');
         setLoginError('Login succeeded but profile data is missing. Please contact support.');
@@ -203,7 +207,8 @@ export function LoginRegister({ onLoginSuccess, onNavigateHome }: LoginRegisterP
         console.log('User auto-confirmed, proceeding with auto-login');
         
         // Fetch profile if not already included
-        let profile = data.profile;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let profile = (data as any)?.profile as Profile | null | undefined;
         if (!profile) {
           console.log('Fetching profile for new user:', data.user.id);
           const { data: profileData } = await supabase
@@ -214,17 +219,20 @@ export function LoginRegister({ onLoginSuccess, onNavigateHome }: LoginRegisterP
           profile = profileData;
         }
 
-        if (profile) {
+        if (profile && data.user) {
           // Auto-login after successful registration
+          const userId = data.user.id;
+          const userEmail = data.user.email;
           setTimeout(() => {
             const userData = {
-              id: data.user.id,
+              id: userId,
               name: profile.full_name || registerName,
-              email: data.user.email || registerEmail,
+              email: userEmail || registerEmail,
               role: (profile.role || 'member') as 'member' | 'admin',
               phone: profile.phone || registerPhone,
               contactInfo: profile.contact_info || contactUrl,
-              contactPlatform: profile.contact_platform || contactPlatform,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              contactPlatform: (profile as any).contact_platform || contactPlatform,
             };
 
             console.log('Calling onLoginSuccess with:', userData);

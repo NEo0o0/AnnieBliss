@@ -1,3 +1,5 @@
+ "use client";
+
 import { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase/client';
 import type { Tables, TablesInsert, TablesUpdate, Enums } from '../types/database.types';
@@ -63,28 +65,47 @@ export function useBookings(options: UseBookingsOptions = {}) {
 
   const createBooking = async (bookingData: BookingInsert) => {
     try {
-      const { data, error: createError } = await supabase
-        .from('bookings')
-        .insert(bookingData)
-        .select('*, classes(*), user_packages(*)')
-        .single();
-
-      if (createError) throw createError;
-
-      if (bookingData.kind === 'package' && bookingData.user_package_id) {
-        const { error: updateError } = await supabase.rpc('decrement_package_credits', {
-          package_id: bookingData.user_package_id,
+      setLoading(true);
+      
+      let data, error;
+      
+      // ✅ แก้ไข: เช็คประเภทการจอง และเรียก RPC ให้ถูกตัว
+      if (bookingData.kind === 'package') {
+        // กรณีใช้แพ็กเกจ
+        console.log('📦 Booking via Package Payload:', { 
+           p_class_id: bookingData.class_id 
         });
-
-        if (updateError) {
-          console.error('Error decrementing package credits:', updateError);
-        }
+        
+        const res = await supabase.rpc('book_with_package', {
+          p_class_id: Number(bookingData.class_id) // แปลงเป็นตัวเลขให้ชัวร์
+        });
+        data = res.data;
+        error = res.error;
+        
+      } else {
+        // กรณีจ่ายรายครั้ง (Drop-in)
+        const payload = { 
+          p_class_id: Number(bookingData.class_id), 
+          p_amount_due: Number(bookingData.amount_due || 0) 
+        };
+        console.log('💵 Booking Drop-in Payload:', payload);
+        
+        const res = await supabase.rpc('book_dropin', payload);
+        data = res.data;
+        error = res.error;
       }
 
-      setBookings(prev => [data, ...prev]);
+      if (error) throw error;
+
+      // โหลดข้อมูลใหม่หลังจองสำเร็จ
+      await fetchBookings();
+      
       return { data, error: null };
     } catch (err) {
+      console.error('Booking failed:', err);
       return { data: null, error: err as Error };
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -108,29 +129,21 @@ export function useBookings(options: UseBookingsOptions = {}) {
 
   const cancelBooking = async (id: number) => {
     try {
-      const booking = bookings.find(b => b.id === id);
-      
-      const { data, error: updateError } = await supabase
+      // Use cancel_booking RPC which handles credit refunds automatically
+      const { error: rpcError } = await supabase.rpc('cancel_booking', {
+        p_booking_id: id,
+      });
+
+      if (rpcError) throw rpcError;
+
+      // Fetch the updated booking with relations
+      const { data, error: fetchError } = await supabase
         .from('bookings')
-        .update({
-          status: 'cancelled',
-          cancelled_at: new Date().toISOString(),
-        })
-        .eq('id', id)
         .select('*, classes(*), user_packages(*)')
+        .eq('id', id)
         .single();
 
-      if (updateError) throw updateError;
-
-      if (booking?.kind === 'package' && booking.user_package_id) {
-        const { error: refundError } = await supabase.rpc('increment_package_credits', {
-          package_id: booking.user_package_id,
-        });
-
-        if (refundError) {
-          console.error('Error refunding package credits:', refundError);
-        }
-      }
+      if (fetchError) throw fetchError;
 
       setBookings(prev => prev.map(b => (b.id === id ? data : b)));
       return { data, error: null };

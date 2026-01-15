@@ -63,28 +63,43 @@ export function usePayments(options: UsePaymentsOptions = {}) {
 
   const recordPayment = async (paymentData: PaymentInsert) => {
     try {
-      const { data, error: createError } = await supabase
-        .from('payments')
-        .insert(paymentData)
-        .select('*, bookings(*), user_packages(*)')
-        .single();
-
-      if (createError) throw createError;
-
+      // Check if this is a drop-in payment for a booking
       if (paymentData.booking_id) {
-        await supabase
-          .from('bookings')
-          .update({
-            payment_status: 'paid',
-            amount_paid: paymentData.amount,
-            paid_at: paymentData.paid_at || new Date().toISOString(),
-            payment_method: paymentData.method,
-          })
-          .eq('id', paymentData.booking_id);
-      }
+        // Use record_dropin_payment RPC which handles booking updates automatically
+        const { data: paymentId, error: rpcError } = await supabase.rpc('record_dropin_payment', {
+          p_booking_id: paymentData.booking_id,
+          p_amount: paymentData.amount,
+          p_method: paymentData.method,
+          p_evidence_url: paymentData.evidence_url || null,
+          p_note: paymentData.note || null,
+        });
 
-      setPayments(prev => [data, ...prev]);
-      return { data, error: null };
+        if (rpcError) throw rpcError;
+
+        // Fetch the created payment with relations
+        const { data, error: fetchError } = await supabase
+          .from('payments')
+          .select('*, bookings(*), user_packages(*)')
+          .eq('id', paymentId)
+          .single();
+
+        if (fetchError) throw fetchError;
+
+        setPayments(prev => [data, ...prev]);
+        return { data, error: null };
+      } else {
+        // For package payments, use direct insert
+        const { data, error: createError } = await supabase
+          .from('payments')
+          .insert(paymentData)
+          .select('*, bookings(*), user_packages(*)')
+          .single();
+
+        if (createError) throw createError;
+
+        setPayments(prev => [data, ...prev]);
+        return { data, error: null };
+      }
     } catch (err) {
       return { data: null, error: err as Error };
     }

@@ -8,6 +8,7 @@ interface ClassDetailModalProps {
     id: string;
     title: string;
     time: string;
+    starts_at: string;
     instructor: string;
     level: string;
     capacity: number;
@@ -16,6 +17,7 @@ interface ClassDetailModalProps {
     duration: string;
     description: string;
     room: string;
+    price: number;
   };
   onClose: () => void;
   onNavigate: (page: string) => void;
@@ -47,6 +49,7 @@ export function ClassDetailModal({ classData, onClose, onNavigate, onBookingSucc
         class_id: parseInt(classData.id),
         kind: 'drop_in',
         status: 'booked',
+        amount_due: classData.price,
       });
 
       console.log('Booking result:', result);
@@ -97,6 +100,7 @@ export function ClassDetailModal({ classData, onClose, onNavigate, onBookingSucc
 
   const spotsLeft = classData.capacity - classData.enrolled;
   const isFullyBooked = spotsLeft === 0;
+  const isPastClass = new Date(classData.starts_at) < new Date();
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -185,6 +189,14 @@ export function ClassDetailModal({ classData, onClose, onNavigate, onBookingSucc
             </div>
           </div>
 
+          {/* Price Display */}
+          <div className="flex justify-between items-center mb-4 px-1">
+            <span className="text-[var(--color-stone)] font-medium">Price</span>
+            <span className="text-xl font-bold text-[var(--color-earth-dark)]">
+              {classData.price === 0 ? 'Free' : `฿${(classData.price || 0).toLocaleString()}`}
+            </span>
+          </div>
+
           {/* Booking Section */}
           <div className="border-t border-[var(--color-sand)] pt-6">
             {/* Show error message if booking failed */}
@@ -204,16 +216,24 @@ export function ClassDetailModal({ classData, onClose, onNavigate, onBookingSucc
             {user ? (
               <button
                 onClick={handleBooking}
-                disabled={isFullyBooked || bookingLoading || bookingSuccess}
+                disabled={isPastClass || isFullyBooked || bookingLoading || bookingSuccess}
                 className={`w-full py-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 ${
-                  isFullyBooked || bookingLoading || bookingSuccess
+                  isPastClass || isFullyBooked || bookingLoading || bookingSuccess
                     ? 'bg-[var(--color-stone)] text-white cursor-not-allowed'
                     : 'bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white shadow-lg hover:shadow-xl hover:scale-105'
                 }`}
               >
                 <Clock size={20} />
                 <span className="text-lg">
-                  {bookingLoading ? 'Booking...' : bookingSuccess ? 'Booked!' : isFullyBooked ? 'Class Full - Join Waitlist' : 'Book This Class'}
+                  {bookingLoading
+                    ? 'Booking...'
+                    : bookingSuccess
+                      ? 'Booked!'
+                      : isPastClass
+                        ? 'Class Ended'
+                        : isFullyBooked
+                          ? 'Class Full - Join Waitlist'
+                          : 'Book This Class'}
                 </span>
               </button>
             ) : (
@@ -240,7 +260,7 @@ export function ClassDetailModal({ classData, onClose, onNavigate, onBookingSucc
           {/* Additional Info */}
           <div className="bg-[var(--color-cream)] p-4 rounded-lg">
             <p className="text-sm text-[var(--color-stone)]">
-              💡 <strong>First class free</strong> for new students • Drop-in: $25 • Unlimited monthly pass available
+              💡 <strong>First class free</strong> for new students • Drop-in: ฿{(classData.price || 0).toLocaleString()} • Unlimited monthly pass available
             </p>
           </div>
         </div>

@@ -124,7 +124,6 @@ export default function App() {
             console.log('Session restored with user:', userData);
             setCurrentUser(userData);
             setIsAuthenticated(true);
-            setCurrentPage('member'); // Redirect to dashboard
           }
         } else {
           console.log('No session found');
@@ -259,7 +258,7 @@ export default function App() {
           
           {currentPage === 'teacher-training' && (
             <>
-              <TeacherTrainingHero />
+              <TeacherTrainingHero onNavigate={handleNavigate} />
               <Curriculum />
               <SchedulePricing onNavigate={handleNavigate} />
               <ApplyCTA />

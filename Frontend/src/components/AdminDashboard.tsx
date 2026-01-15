@@ -1,4 +1,7 @@
-import { useState, useEffect } from 'react';
+"use client";
+
+import { useState, useEffect, useCallback, useMemo } from 'react';
+
 import { 
   LayoutDashboard, 
   Calendar, 
@@ -6,10 +9,8 @@ import {
   DollarSign, 
   Settings, 
   FileText, 
-  TrendingUp,
   UserCheck,
   CreditCard,
-  Clock,
   User,
   Plus,
   Menu,
@@ -17,13 +18,8 @@ import {
   Home,
   LogOut,
   ChevronDown,
-  Phone,
-  MessageCircle,
-  Instagram,
-  Facebook,
-  ExternalLink,
-  AlertCircle,
-  Mail
+  Mail,
+  Loader2,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { CreateClassModal } from './CreateClassModal';
@@ -33,175 +29,40 @@ import { PaymentsManagement } from './PaymentsManagement';
 import { ReportsAnalytics } from './ReportsAnalytics';
 import { TodaysClassesTable } from './TodaysClassesTable';
 import { NewsletterSubscribers } from './NewsletterSubscribers';
-import { ManualBookingModal } from './ManualBookingModal';
+import { AdminBookingModal } from './AdminBookingModal';
+import { ConfirmationModal } from './ConfirmationModal';
 import { toast } from 'sonner';
+import { useDashboardStats } from '../hooks/useDashboardStats';
+import { supabase } from '@/utils/supabase/client';
 
-// Mock student bookings for each class
-const mockBookings = {
-  1: [ // Morning Vinyasa Flow
-    {
-      id: 'b1',
-      studentId: 's1',
-      name: 'Sarah Johnson',
-      avatar: 'SJ',
-      phone: '+66 81 234 5678',
-      contactInfo: 'https://line.me/ti/p/~sarahline',
-      contactPlatform: 'line',
-      status: 'confirmed',
-      bookingTime: '2025-12-20 08:30 AM',
-    },
-    {
-      id: 'b2',
-      studentId: 's2',
-      name: 'Emma Wilson',
-      avatar: 'EW',
-      phone: '+66 82 345 6789',
-      contactInfo: 'https://instagram.com/emmawilson',
-      contactPlatform: 'instagram',
-      status: 'confirmed',
-      bookingTime: '2025-12-21 10:15 AM',
-    },
-    {
-      id: 'b3',
-      studentId: 's3',
-      name: 'Michael Chen',
-      avatar: 'MC',
-      phone: '+66 83 456 7890',
-      contactInfo: 'https://wa.me/66834567890',
-      contactPlatform: 'whatsapp',
-      status: 'checked-in',
-      bookingTime: '2025-12-19 02:00 PM',
-    },
-    {
-      id: 'b4',
-      studentId: 's4',
-      name: 'Lisa Anderson',
-      avatar: 'LA',
-      phone: '+66 84 567 8901',
-      contactInfo: '',
-      contactPlatform: '',
-      status: 'confirmed',
-      bookingTime: '2025-12-22 11:45 AM',
-    },
-  ],
-  2: [ // Gentle Yoga
-    {
-      id: 'b5',
-      studentId: 's5',
-      name: 'David Kim',
-      avatar: 'DK',
-      phone: '+66 85 678 9012',
-      contactInfo: 'https://line.me/ti/p/~davidkim',
-      contactPlatform: 'line',
-      status: 'confirmed',
-      bookingTime: '2025-12-23 09:00 AM',
-    },
-    {
-      id: 'b6',
-      studentId: 's6',
-      name: 'Sophia Martinez',
-      avatar: 'SM',
-      phone: '+66 86 789 0123',
-      contactInfo: 'https://facebook.com/sophiamartinez',
-      contactPlatform: 'facebook',
-      status: 'confirmed',
-      bookingTime: '2025-12-23 10:30 AM',
-    },
-  ],
-  3: [ // Power Yoga - Full
-    {
-      id: 'b7',
-      studentId: 's7',
-      name: 'James Taylor',
-      avatar: 'JT',
-      phone: '+66 87 890 1234',
-      contactInfo: 'https://line.me/ti/p/~jamestaylor',
-      contactPlatform: 'line',
-      status: 'checked-in',
-      bookingTime: '2025-12-20 01:00 PM',
-    },
-    {
-      id: 'b8',
-      studentId: 's8',
-      name: 'Olivia Brown',
-      avatar: 'OB',
-      phone: '+66 88 901 2345',
-      contactInfo: 'https://instagram.com/oliviabrown',
-      contactPlatform: 'instagram',
-      status: 'confirmed',
-      bookingTime: '2025-12-21 03:45 PM',
-    },
-  ],
-  4: [ // Restorative Yin
-    {
-      id: 'b9',
-      studentId: 's9',
-      name: 'Daniel Lee',
-      avatar: 'DL',
-      phone: '+66 89 012 3456',
-      contactInfo: 'https://wa.me/66890123456',
-      contactPlatform: 'whatsapp',
-      status: 'confirmed',
-      bookingTime: '2025-12-22 02:15 PM',
-    },
-  ],
-  5: [ // Evening Flow
-    {
-      id: 'b10',
-      studentId: 's10',
-      name: 'Ava Garcia',
-      avatar: 'AG',
-      phone: '+66 90 123 4567',
-      contactInfo: 'https://line.me/ti/p/~avagarcia',
-      contactPlatform: 'line',
-      status: 'confirmed',
-      bookingTime: '2025-12-23 08:00 AM',
-    },
-  ],
+type AdminBooking = {
+  id: string;
+  studentId?: string;
+  name?: string;
+  avatar?: string;
+  phone?: string;
+  contactInfo?: string;
+  contactPlatform?: string;
+  status?: string;
+  bookingTime?: string;
+  class_id?: number;
+  guest_name?: string | null;
+  paymentStatus?: string;
+  amountDue?: number;
+  amountPaid?: number;
+  paidAt?: string | null;
+  isAttended?: boolean;
 };
 
-const todaysClasses = [
-  {
-    id: 1,
-    name: 'Morning Vinyasa Flow',
-    time: '6:00 AM - 7:00 AM',
-    booked: 12,
-    capacity: 15,
-    instructor: 'Annie Bliss',
-  },
-  {
-    id: 2,
-    name: 'Gentle Yoga',
-    time: '8:00 AM - 9:00 AM',
-    booked: 8,
-    capacity: 12,
-    instructor: 'Sarah Chen',
-  },
-  {
-    id: 3,
-    name: 'Power Yoga',
-    time: '12:00 PM - 1:00 PM',
-    booked: 15,
-    capacity: 15,
-    instructor: 'Annie Bliss',
-  },
-  {
-    id: 4,
-    name: 'Restorative Yin',
-    time: '5:30 PM - 6:45 PM',
-    booked: 10,
-    capacity: 15,
-    instructor: 'Maya Rodriguez',
-  },
-  {
-    id: 5,
-    name: 'Evening Flow',
-    time: '7:00 PM - 8:00 PM',
-    booked: 14,
-    capacity: 15,
-    instructor: 'Annie Bliss',
-  },
-];
+type TodaysClassItem = {
+  id: number;
+  name: string;
+  time: string;
+  booked: number;
+  capacity: number;
+  instructor: string;
+  room?: string;
+};
 
 interface AdminDashboardProps {
   onNavigateHome?: () => void;
@@ -209,64 +70,196 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps = {}) {
-  const { classes, setIsLoggedIn } = useApp();
+  const { setIsLoggedIn } = useApp();
+  const { stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useDashboardStats();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [currentSection, setCurrentSection] = useState('dashboard');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState<string>('member');
+
+  const [now, setNow] = useState<Date | null>(null);
+
   const [showManualBookingModal, setShowManualBookingModal] = useState(false);
   const [selectedClass, setSelectedClass] = useState<{ id: number; name: string; time: string } | null>(null);
-  const [bookingsState, setBookingsState] = useState(mockBookings);
-  const [mockMembers, setMockMembers] = useState([
-    {
-      id: 's1',
-      fullName: 'Sarah Johnson',
-      email: 'sarah.j@email.com',
-      phone: '+66 81 234 5678',
-      avatar: 'SJ',
-      packageType: 'unlimited' as const,
-      packageName: 'Unlimited Monthly',
-      creditsLeft: undefined
-    },
-    {
-      id: 's2',
-      fullName: 'Emma Wilson',
-      email: 'emma.w@email.com',
-      phone: '+66 82 345 6789',
-      avatar: 'EW',
-      packageType: 'class-pack' as const,
-      packageName: '10-Class Pack',
-      creditsLeft: 7
-    },
-    {
-      id: 's3',
-      fullName: 'Michael Chen',
-      email: 'michael.c@email.com',
-      phone: '+66 83 456 7890',
-      avatar: 'MC',
-      packageType: 'class-pack' as const,
-      packageName: '20-Class Pack',
-      creditsLeft: 15
-    }
-  ]);
+  const [selectedClassDefaultAmountDue, setSelectedClassDefaultAmountDue] = useState<number>(0);
+  const [bookingsState, setBookingsState] = useState<Record<number, AdminBooking[]>>({});
+  const [todaysClassesState, setTodaysClassesState] = useState<TodaysClassItem[]>([]);
+  const [todaysClassesLoading, setTodaysClassesLoading] = useState(false);
+  const [todaysClassesError, setTodaysClassesError] = useState<Error | null>(null);
+  const [todaysBookingsLoading, setTodaysBookingsLoading] = useState(false);
+  const [todaysBookingsError, setTodaysBookingsError] = useState<Error | null>(null);
 
-  // Simulate login when accessing admin
+  const [showCheckinModal, setShowCheckinModal] = useState(false);
+  const [checkinClassId, setCheckinClassId] = useState<number | null>(null);
+  const [checkinSaving, setCheckinSaving] = useState(false);
+
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: 'default' | 'warning' | 'success';
+    confirmText?: string;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+
   useEffect(() => {
     setIsLoggedIn(true);
   }, [setIsLoggedIn]);
 
-  const getCapacityColor = (booked: number, capacity: number) => {
-    const percentage = (booked / capacity) * 100;
-    if (percentage >= 90) return 'text-red-600';
-    if (percentage >= 70) return 'text-orange-600';
-    return 'text-green-600';
-  };
+  // Fetch current user's role for RBAC
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
-  const getCapacityBg = (booked: number, capacity: number) => {
-    const percentage = (booked / capacity) * 100;
-    if (percentage >= 90) return 'bg-red-100';
-    if (percentage >= 70) return 'bg-orange-100';
-    return 'bg-green-100';
-  };
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+
+        if (profile) {
+          setCurrentUserRole(profile.role);
+        }
+      } catch (error) {
+        console.error('Error fetching user role:', error);
+      }
+    };
+
+    fetchUserRole();
+  }, []);
+
+  // Initialize time on client-side only to prevent hydration mismatch
+  useEffect(() => {
+    setNow(new Date()); // Set initial time
+    const tick = () => setNow(new Date());
+    const id = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const loadToday = useCallback(async () => {
+    setTodaysClassesLoading(true);
+    setTodaysClassesError(null);
+    setTodaysBookingsLoading(true);
+    setTodaysBookingsError(null);
+
+    try {
+      const now = new Date();
+      const start = new Date(now);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(now);
+      end.setHours(23, 59, 59, 999);
+
+      const { data: classesData, error: classesError } = await supabase
+        .from('classes')
+        .select(
+          'id, title, starts_at, ends_at, capacity, booked_count, location, instructor_id, class_types(title), instructor:profiles!classes_instructor_id_fkey(full_name)'
+        )
+        .eq('is_cancelled', false)
+        .eq('category', 'class')
+        .gte('starts_at', start.toISOString())
+        .lte('starts_at', end.toISOString())
+        .order('starts_at', { ascending: true });
+
+      if (classesError) throw classesError;
+
+      const mappedClasses: TodaysClassItem[] = (classesData ?? []).map((c: any) => {
+        const startTime = new Date(c.starts_at);
+        const endTime = c.ends_at ? new Date(c.ends_at) : null;
+        const fmt = (d: Date) =>
+          d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        const time = endTime ? `${fmt(startTime)} - ${fmt(endTime)}` : fmt(startTime);
+        return {
+          id: Number(c.id),
+          name: c.title,
+          time,
+          booked: Number(c.booked_count ?? 0),
+          capacity: Number(c.capacity ?? 0),
+          instructor: c.instructor?.full_name ?? '—',
+          room: c.location ?? '',
+        };
+      });
+
+      setTodaysClassesState(mappedClasses);
+
+      const classIds = mappedClasses.map((c) => c.id);
+      if (classIds.length === 0) {
+        setBookingsState({});
+        return;
+      }
+
+      try {
+        const { data: bookingsData, error: bookingsError } = await supabase
+          .from('bookings')
+          .select(
+            'id, class_id, user_id, status, is_attended, payment_status, amount_due, amount_paid, paid_at, guest_name, guest_contact, profiles(full_name)'
+          )
+          .in('class_id', classIds)
+          .neq('status', 'cancelled')
+          .is('cancelled_at', null)
+          .order('id', { ascending: false });
+
+        if (bookingsError) throw bookingsError;
+
+        const byClass: Record<number, AdminBooking[]> = {};
+        for (const b of bookingsData ?? []) {
+          const profile = (b as any).profiles;
+          const fullName = profile?.full_name ?? 'Unnamed';
+          const initials = String(fullName)
+            .split(' ')
+            .filter(Boolean)
+            .slice(0, 2)
+            .map((n) => n[0])
+            .join('')
+            .toUpperCase();
+
+          const classId = Number((b as any).class_id);
+          byClass[classId] = byClass[classId] ?? [];
+          byClass[classId].push({
+            id: String((b as any).id),
+            studentId: String((b as any).user_id ?? ''),
+            name: fullName,
+            avatar: initials,
+            phone: '',
+            contactInfo: '',
+            contactPlatform: '',
+            status: 'confirmed',
+            bookingTime: '',
+            class_id: classId,
+            guest_name: (b as any).guest_name ?? null,
+            paymentStatus: String((b as any).payment_status ?? ''),
+            amountDue: Number((b as any).amount_due ?? 0),
+            amountPaid: Number((b as any).amount_paid ?? 0),
+            paidAt: ((b as any).paid_at as string | null) ?? null,
+            isAttended: Boolean((b as any).is_attended),
+          });
+        }
+
+        setBookingsState(byClass);
+      } catch (e) {
+        const asError = e instanceof Error ? e : new Error(String(e));
+        setTodaysBookingsError(asError);
+        setBookingsState({});
+      }
+    } catch (e) {
+      const asError = e instanceof Error ? e : new Error(String(e));
+      setTodaysClassesError(asError);
+      setTodaysBookingsError(asError);
+      
+      // Show toast notification for better UX
+      const message = asError.message || 'Failed to load today\'s classes';
+      toast.error(message, { duration: 5000 });
+      console.error('Error loading today\'s data:', asError);
+    } finally {
+      setTodaysClassesLoading(false);
+      setTodaysBookingsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadToday();
+  }, [loadToday]);
 
   const handleNavigateHome = () => {
     if (onNavigateHome) {
@@ -295,14 +288,27 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
     closeMobileSidebar();
   };
 
-  const handleManualBooking = (classId: number, className: string, classTime: string) => {
+  const handleManualBooking = async (classId: number, className: string, classTime: string) => {
     setSelectedClass({ id: classId, name: className, time: classTime });
+    setSelectedClassDefaultAmountDue(0);
+    try {
+      const { data } = await supabase
+        .from('classes')
+        .select('price')
+        .eq('id', Number(classId))
+        .maybeSingle();
+
+      const price = Number((data as any)?.price ?? 0);
+      setSelectedClassDefaultAmountDue(Number.isFinite(price) ? price : 0);
+    } catch {
+      // Keep default
+    }
     setShowManualBookingModal(true);
   };
 
-  const handleBookingComplete = (booking: any, payment?: any) => {
+  const handleBookingComplete = (booking: AdminBooking, payment?: any) => {
     // Add new booking to state
-    const classId = booking.class_id;
+    const classId = Number(booking.class_id);
     setBookingsState(prev => ({
       ...prev,
       [classId]: [...(prev[classId] || []), booking]
@@ -334,7 +340,7 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
       // Update booking payment status in state
       setBookingsState(prev => ({
         ...prev,
-        [classId]: (prev[classId] || []).map(booking => 
+        [classId]: (prev[classId] || []).map((booking: AdminBooking) => 
           booking.id === bookingId 
             ? { ...booking, paymentStatus: 'paid' }
             : booking
@@ -342,7 +348,7 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
       }));
 
       // Create payment record
-      const booking = bookingsState[classId]?.find(b => b.id === bookingId);
+      const booking = bookingsState[classId]?.find((b: AdminBooking) => b.id === bookingId);
       const paymentRecord = {
         id: `payment-${Date.now()}`,
         title: `Drop-in: ${booking?.name} - ${className}`,
@@ -366,8 +372,204 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
     }
   };
 
-  const handleMemberRegistered = (member: any) => {
-    setMockMembers(prev => [...prev, member]);
+  const handleCancelBooking = async (bookingId: string, classId: number, className: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Cancel Booking',
+      message: `Are you sure you want to cancel this booking for ${className}? This action cannot be undone.`,
+      variant: 'warning',
+      confirmText: 'Yes, Cancel',
+      onConfirm: async () => {
+        try {
+          const idAsNumber = Number(bookingId);
+          if (!Number.isFinite(idAsNumber)) {
+            toast.error('This booking cannot be cancelled (invalid id)');
+            return;
+          }
+
+          const { error } = await supabase.rpc('cancel_booking', { p_booking_id: idAsNumber });
+          if (error) throw error;
+
+          setBookingsState((prev) => ({
+            ...prev,
+            [classId]: (prev[classId] || []).filter((b: any) => String(b.id) !== String(bookingId)),
+          }));
+
+          setTodaysClassesState((prev) =>
+            prev.map((c) => {
+              if (Number(c.id) !== Number(classId)) return c;
+              return { ...c, booked: Math.max(0, Number(c.booked ?? 0) - 1) };
+            })
+          );
+
+          toast.success(`Booking cancelled for ${className}`, { duration: 3000 });
+          await loadToday();
+          void refetchStats();
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e);
+          toast.error(message || 'Failed to cancel booking');
+        }
+      },
+    });
+  };
+
+  const handleToggleAttendance = async (bookingId: string, classId: number, nextValue: boolean) => {
+    const bookingIdAsNumber = Number(bookingId);
+    if (!Number.isFinite(bookingIdAsNumber)) {
+      toast.error('Invalid booking id');
+      return;
+    }
+
+    // Optimistic update
+    setBookingsState((prev) => ({
+      ...prev,
+      [classId]: (prev[classId] || []).map((b: AdminBooking) =>
+        String(b.id) === String(bookingId) ? { ...b, isAttended: nextValue } : b
+      ),
+    }));
+
+    try {
+      setCheckinSaving(true);
+      const { error } = await supabase
+        .from('bookings')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update({ is_attended: nextValue } as any)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .eq('id' as any, bookingIdAsNumber as any);
+
+      if (error) throw error;
+
+      // Refetch to ensure fresh data
+      await loadToday();
+      void refetchStats();
+
+      toast.success(
+        nextValue 
+          ? 'Check-in recorded successfully!' 
+          : 'Check-out recorded successfully!',
+        { duration: 3000 }
+      );
+    } catch (e) {
+      // Revert on error
+      setBookingsState((prev) => ({
+        ...prev,
+        [classId]: (prev[classId] || []).map((b: AdminBooking) =>
+          String(b.id) === String(bookingId) ? { ...b, isAttended: !nextValue } : b
+        ),
+      }));
+      const message = e instanceof Error ? e.message : String(e);
+      toast.error(message || 'Failed to update check-in');
+    } finally {
+      setCheckinSaving(false);
+    }
+  };
+
+  const handleTogglePaymentStatus = async (
+    bookingId: string,
+    classId: number,
+    nextStatus: 'paid' | 'unpaid',
+    amountDue: number
+  ) => {
+    const bookingIdAsNumber = Number(bookingId);
+    if (!Number.isFinite(bookingIdAsNumber)) {
+      toast.error('Invalid booking id');
+      return;
+    }
+
+    const nextAmountPaid = nextStatus === 'paid' ? Number(amountDue ?? 0) : 0;
+    const nextPaidAt = nextStatus === 'paid' ? new Date().toISOString() : null;
+
+    // Optimistic update
+    setBookingsState((prev) => ({
+      ...prev,
+      [classId]: (prev[classId] || []).map((b: AdminBooking) =>
+        String(b.id) === String(bookingId)
+          ? { ...b, paymentStatus: nextStatus, amountPaid: nextAmountPaid, paidAt: nextPaidAt }
+          : b
+      ),
+    }));
+
+    try {
+      // Get current admin user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('Not authenticated');
+      }
+
+      // Get booking details for payment record
+      const booking = bookingsState[classId]?.find((b: AdminBooking) => String(b.id) === String(bookingId));
+      if (!booking) {
+        throw new Error('Booking not found');
+      }
+
+      // Update bookings table
+      const updatePayload: Record<string, any> = {
+        payment_status: nextStatus,
+        amount_paid: nextAmountPaid,
+        paid_at: nextPaidAt,
+      };
+
+      const { error: bookingError } = await supabase
+        .from('bookings')
+        .update(updatePayload)
+        .eq('id', bookingIdAsNumber);
+
+      if (bookingError) {
+        console.error('Booking update error:', bookingError);
+        throw bookingError;
+      }
+
+      // If marking as PAID, insert payment record for audit trail
+      if (nextStatus === 'paid' && nextAmountPaid > 0) {
+        const { error: paymentError } = await supabase
+          .from('payments')
+          .insert({
+            booking_id: bookingIdAsNumber,
+            user_id: booking.studentId || user.id,
+            amount: nextAmountPaid,
+            method: 'cash',
+            log_status: 'paid',
+            paid_at: nextPaidAt,
+            recorded_by: user.id,
+            currency: 'THB',
+            note: `Payment recorded via admin dashboard for class booking #${bookingIdAsNumber}`
+          });
+
+        if (paymentError) {
+          console.error('Failed to create payment record:', paymentError);
+          toast.warning('Payment recorded but audit log failed. Please check logs.');
+        }
+      }
+
+      // Refresh revenue immediately
+      void refetchStats();
+
+      // Show success toast
+      toast.success(
+        nextStatus === 'paid' 
+          ? `Payment of ฿${amountDue} recorded successfully!` 
+          : 'Payment status updated to unpaid',
+        { duration: 3000 }
+      );
+    } catch (e) {
+      // Revert on error
+      setBookingsState((prev) => ({
+        ...prev,
+        [classId]: (prev[classId] || []).map((b: AdminBooking) => {
+          if (String(b.id) !== String(bookingId)) return b;
+          const revertedStatus = nextStatus === 'paid' ? 'unpaid' : 'paid';
+          return {
+            ...b,
+            paymentStatus: revertedStatus,
+            amountPaid: revertedStatus === 'paid' ? Number(amountDue ?? 0) : 0,
+            paidAt: revertedStatus === 'paid' ? new Date().toISOString() : null,
+          };
+        }),
+      }));
+
+      const message = e instanceof Error ? e.message : String(e);
+      toast.error(message || 'Failed to update payment status');
+    }
   };
 
   const renderPlaceholder = (title: string) => (
@@ -379,17 +581,14 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
     </div>
   );
 
-  // Sidebar Content Component (reusable for desktop and mobile)
   const SidebarContent = () => (
     <>
-      {/* Logo/Brand */}
       <div className="p-6 border-b border-[var(--color-sand)]">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-[var(--color-earth-dark)]">Annie Bliss Yoga</h2>
             <p className="text-xs text-[var(--color-stone)] mt-1">Admin Dashboard</p>
           </div>
-          {/* Close button for mobile */}
           <button
             onClick={closeMobileSidebar}
             className="md:hidden p-2 hover:bg-[var(--color-cream)] rounded-lg transition-colors"
@@ -399,15 +598,14 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
         </div>
       </div>
 
-      {/* Navigation Menu */}
       <nav className="flex-1 p-4 overflow-y-auto">
         <ul className="space-y-2">
           <li>
-            <button 
+            <button
               onClick={() => handleSectionChange('dashboard')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ${
-                currentSection === 'dashboard' 
-                  ? 'bg-[var(--color-sage)] text-white' 
+                currentSection === 'dashboard'
+                  ? 'bg-[var(--color-sage)] text-white'
                   : 'text-[var(--color-stone)] hover:bg-[var(--color-cream)]'
               }`}
             >
@@ -416,11 +614,11 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
             </button>
           </li>
           <li>
-            <button 
+            <button
               onClick={() => handleSectionChange('classes')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ${
-                currentSection === 'classes' 
-                  ? 'bg-[var(--color-sage)] text-white' 
+                currentSection === 'classes'
+                  ? 'bg-[var(--color-sage)] text-white'
                   : 'text-[var(--color-stone)] hover:bg-[var(--color-cream)]'
               }`}
             >
@@ -429,11 +627,11 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
             </button>
           </li>
           <li>
-            <button 
+            <button
               onClick={() => handleSectionChange('members')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ${
-                currentSection === 'members' 
-                  ? 'bg-[var(--color-sage)] text-white' 
+                currentSection === 'members'
+                  ? 'bg-[var(--color-sage)] text-white'
                   : 'text-[var(--color-stone)] hover:bg-[var(--color-cream)]'
               }`}
             >
@@ -442,11 +640,11 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
             </button>
           </li>
           <li>
-            <button 
+            <button
               onClick={() => handleSectionChange('payments')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ${
-                currentSection === 'payments' 
-                  ? 'bg-[var(--color-sage)] text-white' 
+                currentSection === 'payments'
+                  ? 'bg-[var(--color-sage)] text-white'
                   : 'text-[var(--color-stone)] hover:bg-[var(--color-cream)]'
               }`}
             >
@@ -455,11 +653,11 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
             </button>
           </li>
           <li>
-            <button 
+            <button
               onClick={() => handleSectionChange('reports')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ${
-                currentSection === 'reports' 
-                  ? 'bg-[var(--color-sage)] text-white' 
+                currentSection === 'reports'
+                  ? 'bg-[var(--color-sage)] text-white'
                   : 'text-[var(--color-stone)] hover:bg-[var(--color-cream)]'
               }`}
             >
@@ -469,16 +667,15 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
           </li>
         </ul>
 
-        {/* Divider */}
         <div className="my-6 border-t border-[var(--color-sand)]" />
 
         <ul className="space-y-2">
           <li>
-            <button 
+            <button
               onClick={() => handleSectionChange('subscribers')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ${
-                currentSection === 'subscribers' 
-                  ? 'bg-[var(--color-sage)] text-white' 
+                currentSection === 'subscribers'
+                  ? 'bg-[var(--color-sage)] text-white'
                   : 'text-[var(--color-stone)] hover:bg-[var(--color-cream)]'
               }`}
             >
@@ -487,11 +684,11 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
             </button>
           </li>
           <li>
-            <button 
+            <button
               onClick={() => handleSectionChange('settings')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ${
-                currentSection === 'settings' 
-                  ? 'bg-[var(--color-sage)] text-white' 
+                currentSection === 'settings'
+                  ? 'bg-[var(--color-sage)] text-white'
                   : 'text-[var(--color-stone)] hover:bg-[var(--color-cream)]'
               }`}
             >
@@ -502,9 +699,7 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
         </ul>
       </nav>
 
-      {/* Bottom Section - User Info and Actions */}
       <div className="mt-auto border-t border-[var(--color-sand)]">
-        {/* User Info */}
         <div className="p-4">
           <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-[var(--color-cream)]">
             <div className="w-10 h-10 rounded-full bg-[var(--color-sage)] flex items-center justify-center text-white">
@@ -517,7 +712,6 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
           </div>
         </div>
 
-        {/* Navigation Actions */}
         <div className="p-4 space-y-2">
           <button
             onClick={handleNavigateHome}
@@ -545,13 +739,14 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
         <div className="flex items-center justify-between p-4">
           <div>
             <h2 className="text-lg text-[var(--color-earth-dark)]">Annie Bliss Yoga</h2>
-            <p className="text-xs text-[var(--color-stone)]">Admin Dashboard</p>
+            <p className="text-xs text-[var(--color-stone)] mt-1">Admin Dashboard</p>
           </div>
+          {/* Close button for mobile */}
           <button
-            onClick={() => setIsMobileSidebarOpen(true)}
-            className="p-2 hover:bg-[var(--color-cream)] rounded-lg transition-colors"
+            onClick={closeMobileSidebar}
+            className="md:hidden p-2 hover:bg-[var(--color-cream)] rounded-lg transition-colors"
           >
-            <Menu size={24} className="text-[var(--color-earth-dark)]" />
+            <X size={24} className="text-[var(--color-stone)]" />
           </button>
         </div>
       </div>
@@ -591,11 +786,15 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                   <h1 className="text-2xl md:text-3xl text-[var(--color-earth-dark)] mb-1">Dashboard</h1>
-                  <p className="text-sm md:text-base text-[var(--color-stone)]">Wednesday, December 24, 2025</p>
+                  <p className="text-sm md:text-base text-[var(--color-stone)]">
+                    {now ? now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'Loading...'}
+                  </p>
                 </div>
                 <div className="text-left md:text-right">
                   <div className="text-xs md:text-sm text-[var(--color-stone)]">Current Time</div>
-                  <div className="text-xl md:text-2xl text-[var(--color-earth-dark)]">2:45 PM</div>
+                  <div className="text-xl md:text-2xl text-[var(--color-earth-dark)]">
+                    {now ? now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '--:--'}
+                  </div>
                 </div>
               </div>
             </div>
@@ -612,12 +811,10 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
                       <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-blue-100 flex items-center justify-center">
                         <Calendar size={20} className="md:w-6 md:h-6 text-blue-600" />
                       </div>
-                      <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full flex items-center gap-1">
-                        <TrendingUp size={12} />
-                        12%
-                      </span>
                     </div>
-                    <div className="text-2xl md:text-3xl text-[var(--color-earth-dark)] mb-1">247</div>
+                    <div className="text-2xl md:text-3xl text-[var(--color-earth-dark)] mb-1">
+                      {statsLoading ? <Loader2 size={20} className="animate-spin" /> : statsError ? 'Error' : (stats?.total_bookings ?? '—')}
+                    </div>
                     <div className="text-sm text-[var(--color-stone)]">Total Bookings</div>
                     <div className="text-xs text-[var(--color-stone)] mt-2">This month</div>
                   </div>
@@ -628,31 +825,29 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
                       <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-purple-100 flex items-center justify-center">
                         <Users size={20} className="md:w-6 md:h-6 text-purple-600" />
                       </div>
-                      <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full flex items-center gap-1">
-                        <TrendingUp size={12} />
-                        8%
-                      </span>
                     </div>
-                    <div className="text-2xl md:text-3xl text-[var(--color-earth-dark)] mb-1">156</div>
+                    <div className="text-2xl md:text-3xl text-[var(--color-earth-dark)] mb-1">
+                      {statsLoading ? <Loader2 size={20} className="animate-spin" /> : statsError ? 'Error' : (stats?.active_members ?? '—')}
+                    </div>
                     <div className="text-sm text-[var(--color-stone)]">Active Members</div>
                     <div className="text-xs text-[var(--color-stone)] mt-2">Current month</div>
                   </div>
 
-                  {/* Revenue Card */}
-                  <div className="bg-white rounded-lg p-4 md:p-6 shadow-md hover:shadow-xl transition-shadow duration-300">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-green-100 flex items-center justify-center">
-                        <DollarSign size={20} className="md:w-6 md:h-6 text-green-600" />
+                  {/* Revenue Card - Hidden for Instructors */}
+                  {currentUserRole === 'admin' && (
+                    <div className="bg-white rounded-lg p-4 md:p-6 shadow-md hover:shadow-xl transition-shadow duration-300">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-green-100 flex items-center justify-center">
+                          <DollarSign size={20} className="md:w-6 md:h-6 text-green-600" />
+                        </div>
                       </div>
-                      <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full flex items-center gap-1">
-                        <TrendingUp size={12} />
-                        15%
-                      </span>
+                      <div className="text-2xl md:text-3xl text-[var(--color-earth-dark)] mb-1">
+                        {statsLoading ? <Loader2 size={20} className="animate-spin" /> : statsError ? 'Error' : stats?.revenue != null ? `฿${Number(stats.revenue).toLocaleString()}` : '—'}
+                      </div>
+                      <div className="text-sm text-[var(--color-stone)]">Revenue</div>
+                      <div className="text-xs text-[var(--color-stone)] mt-2">This month</div>
                     </div>
-                    <div className="text-2xl md:text-3xl text-[var(--color-earth-dark)] mb-1">฿82,450</div>
-                    <div className="text-sm text-[var(--color-stone)]">Revenue</div>
-                    <div className="text-xs text-[var(--color-stone)] mt-2">This month</div>
-                  </div>
+                  )}
 
                   {/* Drop-ins Card */}
                   <div className="bg-white rounded-lg p-4 md:p-6 shadow-md hover:shadow-xl transition-shadow duration-300">
@@ -660,12 +855,10 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
                       <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-orange-100 flex items-center justify-center">
                         <UserCheck size={20} className="md:w-6 md:h-6 text-orange-600" />
                       </div>
-                      <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full flex items-center gap-1">
-                        <TrendingUp size={12} />
-                        5%
-                      </span>
                     </div>
-                    <div className="text-2xl md:text-3xl text-[var(--color-earth-dark)] mb-1">43</div>
+                    <div className="text-2xl md:text-3xl text-[var(--color-earth-dark)] mb-1">
+                      {statsLoading ? <Loader2 size={20} className="animate-spin" /> : statsError ? 'Error' : (stats?.dropins ?? '—')}
+                    </div>
                     <div className="text-sm text-[var(--color-stone)]">Drop-ins</div>
                     <div className="text-xs text-[var(--color-stone)] mt-2">This month</div>
                   </div>
@@ -676,12 +869,37 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
                 {/* Today's Classes Table */}
                 <div className="lg:col-span-2">
-                  <TodaysClassesTable 
-                    classes={todaysClasses} 
-                    bookings={bookingsState}
-                    onManualBooking={handleManualBooking}
-                    onMarkAsPaid={handleMarkAsPaid}
-                  />
+                  {todaysClassesLoading || todaysBookingsLoading ? (
+                    <div className="bg-white rounded-lg shadow-md p-10 flex items-center justify-center text-[var(--color-stone)]">
+                      <Loader2 size={20} className="animate-spin mr-2" />
+                      Loading...
+                    </div>
+                  ) : todaysClassesError || todaysBookingsError ? (
+                    <div className="bg-white rounded-lg shadow-md p-10 text-center">
+                      <div className="text-red-600 mb-4">
+                        <p className="text-lg mb-2">Failed to load today's classes</p>
+                        <p className="text-sm text-[var(--color-stone)]">
+                          {todaysClassesError?.message || todaysBookingsError?.message || 'An error occurred'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => loadToday()}
+                        className="bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white px-6 py-3 rounded-lg transition-all duration-300"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  ) : (
+                    <TodaysClassesTable 
+                      classes={todaysClassesState as any} 
+                      bookings={bookingsState as any}
+                      onManualBooking={handleManualBooking}
+                      onMarkAsPaid={handleMarkAsPaid}
+                      onCancelBooking={handleCancelBooking}
+                      onToggleAttendance={handleToggleAttendance as any}
+                      onTogglePaymentStatus={handleTogglePaymentStatus as any}
+                    />
+                  )}
                 </div>
 
                 {/* Quick Actions */}
@@ -691,7 +909,18 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
                     
                     <div className="space-y-4">
                       {/* Check-in User Button */}
-                      <button className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white px-4 md:px-6 py-3 md:py-4 rounded-lg transition-all duration-300 shadow-md hover:shadow-lg flex items-center justify-center gap-3 group">
+                      <button
+                        onClick={() => {
+                          if (todaysClassesState.length === 0) {
+                            toast.error('No classes scheduled today');
+                            return;
+                          }
+                          // Force selecting a class in the modal (don't auto-select silently)
+                          setCheckinClassId(null);
+                          setShowCheckinModal(true);
+                        }}
+                        className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white px-4 md:px-6 py-3 md:py-4 rounded-lg transition-all duration-300 shadow-md hover:shadow-lg flex items-center justify-center gap-3 group"
+                      >
                         <UserCheck size={20} className="group-hover:scale-110 transition-transform duration-300" />
                         <span className="text-sm md:text-base">Check-in User</span>
                       </button>
@@ -730,15 +959,29 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-xs md:text-sm opacity-90">Total Check-ins</span>
-                        <span className="text-xl md:text-2xl">38</span>
+                        <span className="text-xl md:text-2xl">
+                          {statsLoading ? <Loader2 size={18} className="animate-spin" /> : statsError ? 'Error' : (stats?.today_checkins ?? '—')}
+                        </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs md:text-sm opacity-90">Classes Completed</span>
-                        <span className="text-xl md:text-2xl">3</span>
+                        <span className="text-xl md:text-2xl">
+                          {statsLoading ? <Loader2 size={18} className="animate-spin" /> : statsError ? 'Error' : (stats?.today_classes_completed ?? '—')}
+                        </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs md:text-sm opacity-90">Revenue Today</span>
-                        <span className="text-xl md:text-2xl">฿4,200</span>
+                        <span className="text-xl md:text-2xl">
+                          {statsLoading ? (
+                            <Loader2 size={18} className="animate-spin" />
+                          ) : statsError ? (
+                            'Error'
+                          ) : stats?.today_revenue != null ? (
+                            `฿${Number(stats.today_revenue).toLocaleString()}`
+                          ) : (
+                            '—'
+                          )}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -758,21 +1001,142 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
       
       {/* Create Class Modal */}
       {showCreateModal && (
-        <CreateClassModal onClose={() => setShowCreateModal(false)} />
+        <CreateClassModal
+          onClose={() => setShowCreateModal(false)}
+          onCreated={() => {
+            void loadToday();
+          }}
+        />
+      )}
+      
+      {/* Check-in Modal */}
+      {showCheckinModal && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowCheckinModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative bg-gradient-to-br from-[var(--color-sage)] to-[var(--color-clay)] text-white p-6 rounded-t-2xl">
+              <button
+                onClick={() => setShowCheckinModal(false)}
+                className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-full transition-colors duration-300"
+              >
+                <X size={20} />
+              </button>
+              <h2 className="text-white">Check-in</h2>
+              <p className="text-white/90 mt-1 text-sm">Toggle attendance for today’s bookings</p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm text-[var(--color-stone)] mb-2">Class</label>
+                <select
+                  value={checkinClassId ?? ''}
+                  onChange={(e) => setCheckinClassId(e.target.value ? Number(e.target.value) : null)}
+                  className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
+                >
+                  <option value="">Select a class</option>
+                  {todaysClassesState.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.time} — {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="border-t border-[var(--color-sand)]" />
+
+              {checkinClassId == null ? (
+                <div className="text-sm text-[var(--color-stone)]">Select a class to view bookings.</div>
+              ) : (bookingsState[checkinClassId] ?? []).length === 0 ? (
+                <div className="text-sm text-[var(--color-stone)]">
+                  <div>No bookings for this class.</div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const selected = todaysClassesState.find((c) => c.id === checkinClassId);
+                      if (!selected) return;
+                      setShowCheckinModal(false);
+                      void handleManualBooking(selected.id, selected.name, selected.time);
+                    }}
+                    className="mt-4 bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white px-4 py-2 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+                  >
+                    Book Student
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {(bookingsState[checkinClassId] ?? []).map((b: AdminBooking) => (
+                    <div
+                      key={b.id}
+                      className="flex items-center justify-between gap-3 bg-[var(--color-cream)]/40 border border-[var(--color-sand)] rounded-lg px-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-sm text-[var(--color-earth-dark)] truncate">{b.name ?? 'Unnamed'}</div>
+                        <div className="text-xs text-[var(--color-stone)] truncate">{b.bookingTime ?? ''}</div>
+                      </div>
+
+                      <button
+                        disabled={checkinSaving}
+                        onClick={() =>
+                          handleToggleAttendance(String(b.id), checkinClassId, !Boolean((b as any).isAttended))
+                        }
+                        className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-all duration-200 flex items-center gap-1.5 ${
+                          Boolean((b as any).isAttended)
+                            ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            : 'bg-[var(--color-sage)] text-white hover:bg-[var(--color-clay)] shadow-sm hover:shadow-md'
+                        }`}
+                      >
+                        <UserCheck size={14} />
+                        {Boolean((b as any).isAttended) ? 'Undo' : 'Check-in'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
       
       {/* Manual Booking Modal */}
       {showManualBookingModal && selectedClass && (
-        <ManualBookingModal
+        <AdminBookingModal
           isOpen={showManualBookingModal}
           onClose={() => setShowManualBookingModal(false)}
           classId={selectedClass.id}
           className={selectedClass.name}
           classTime={selectedClass.time}
-          onBookingComplete={handleBookingComplete}
-          members={mockMembers}
+          defaultAmountDue={selectedClassDefaultAmountDue}
+          onBookingCreated={(booking) => {
+            setBookingsState((prev) => ({
+              ...prev,
+              [Number(booking.class_id)]: [...(prev[Number(booking.class_id)] || []), booking as any],
+            }));
+
+            setTodaysClassesState((prev) =>
+              prev.map((c) => {
+                if (Number(c.id) !== Number(booking.class_id)) return c;
+                return { ...c, booked: Number(c.booked ?? 0) + 1 };
+              })
+            );
+          }}
         />
       )}
+      
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        confirmText={confirmModal.confirmText}
+      />
     </div>
   );
 }

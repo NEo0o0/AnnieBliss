@@ -1,6 +1,8 @@
+"use client";
+
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../utils/supabase/client';
 import type { Tables, TablesInsert, TablesUpdate } from '../types/database.types';
+import { supabase } from '../utils/supabase/client';
 
 type Class = Tables<'classes'>;
 type ClassInsert = TablesInsert<'classes'>;
@@ -12,11 +14,19 @@ interface UseClassesOptions {
   category?: string;
   classTypeId?: number;
   autoFetch?: boolean;
+  initialClasses?: Class[];
 }
 
 export function useClasses(options: UseClassesOptions = {}) {
-  const { startDate, endDate, category, classTypeId, autoFetch = true } = options;
-  const [classes, setClasses] = useState<Class[]>([]);
+  const {
+    startDate,
+    endDate,
+    category,
+    classTypeId,
+    autoFetch = true,
+    initialClasses,
+  } = options;
+  const [classes, setClasses] = useState<Class[]>(initialClasses ?? []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
@@ -25,33 +35,19 @@ export function useClasses(options: UseClassesOptions = {}) {
       setLoading(true);
       setError(null);
 
-      let query = supabase
-        .from('classes')
-        .select('*, class_types(*)')
-        .eq('is_cancelled', false)
-        .order('starts_at', { ascending: true });
+      const params = new URLSearchParams();
+      if (startDate) params.set('start', startDate);
+      if (endDate) params.set('end', endDate);
+      if (category) params.set('category', category);
+      if (classTypeId != null) params.set('classTypeId', String(classTypeId));
 
-      if (startDate) {
-        query = query.gte('starts_at', startDate);
+      const response = await fetch(`/api/classes?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch classes (${response.status})`);
       }
 
-      if (endDate) {
-        query = query.lte('starts_at', endDate);
-      }
-
-      if (category) {
-        query = query.eq('category', category);
-      }
-
-      if (classTypeId) {
-        query = query.eq('class_type_id', classTypeId);
-      }
-
-      const { data, error: fetchError } = await query;
-
-      if (fetchError) throw fetchError;
-
-      setClasses(data || []);
+      const json = (await response.json()) as { data: Class[] };
+      setClasses(json.data ?? []);
     } catch (err) {
       setError(err as Error);
       console.error('Error fetching classes:', err);

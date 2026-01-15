@@ -1,3 +1,5 @@
+ "use client";
+
 import { useState } from 'react';
 import { Database, Check, AlertCircle } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';

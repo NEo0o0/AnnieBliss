@@ -34,6 +34,7 @@ export type Database = {
           class_id: number
           kind: Database['public']['Enums']['booking_kind']
           status: Database['public']['Enums']['booking_status']
+          is_attended: boolean
           user_package_id: number | null
           payment_status: Database['public']['Enums']['payment_status']
           amount_due: number
@@ -52,6 +53,7 @@ export type Database = {
           class_id: number
           kind?: Database['public']['Enums']['booking_kind']
           status?: Database['public']['Enums']['booking_status']
+          is_attended?: boolean
           user_package_id?: number | null
           payment_status?: Database['public']['Enums']['payment_status']
           amount_due?: number
@@ -70,6 +72,7 @@ export type Database = {
           class_id?: number
           kind?: Database['public']['Enums']['booking_kind']
           status?: Database['public']['Enums']['booking_status']
+          is_attended?: boolean
           user_package_id?: number | null
           payment_status?: Database['public']['Enums']['payment_status']
           amount_due?: number
@@ -150,6 +153,7 @@ export type Database = {
           location: string | null
           is_cancelled: boolean
           created_by: string | null
+          instructor_id: string | null
           created_at: string
           description: string | null
           level: string | null
@@ -169,6 +173,7 @@ export type Database = {
           location?: string | null
           is_cancelled?: boolean
           created_by?: string | null
+          instructor_id?: string | null
           created_at?: string
           description?: string | null
           level?: string | null
@@ -188,6 +193,7 @@ export type Database = {
           location?: string | null
           is_cancelled?: boolean
           created_by?: string | null
+          instructor_id?: string | null
           created_at?: string
           description?: string | null
           level?: string | null
@@ -203,6 +209,13 @@ export type Database = {
             columns: ["class_type_id"]
             isOneToOne: false
             referencedRelation: "class_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classes_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -498,7 +511,90 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      book_dropin: {
+        Args: {
+          p_class_id: number
+          p_amount_due: number
+        }
+        Returns: number
+      }
+      book_with_package: {
+        Args: {
+          p_class_id: number
+        }
+        Returns: number
+      }
+      admin_book_dropin: {
+        Args: {
+          p_user_id: string
+          p_class_id: number
+          p_amount_due: number
+        }
+        Returns: number
+      }
+      admin_book_package: {
+        Args: {
+          p_user_id: string
+          p_class_id: number
+        }
+        Returns: number
+      }
+      cancel_booking: {
+        Args: {
+          p_booking_id: number
+        }
+        Returns: undefined
+      }
+      record_dropin_payment: {
+        Args: {
+          p_booking_id: number
+          p_amount: number
+          p_method: Database['public']['Enums']['payment_method']
+          p_evidence_url: string | null
+          p_note: string | null
+        }
+        Returns: number
+      }
+      get_dashboard_stats: {
+        Args: Record<string, never>
+        Returns: Json
+      }
+      get_monthly_financials: {
+        Args: {
+          year_input: number
+          month_input: number
+        }
+        Returns: Json
+      }
+      get_monthly_report_stats: {
+        Args: {
+          target_year: number
+          target_month: number
+        }
+        Returns: Json
+      }
+      get_yearly_report_stats: {
+        Args: {
+          target_year: number
+        }
+        Returns: Json
+      }
+      is_admin: {
+        Args: Record<string, never>
+        Returns: boolean
+      }
+      get_setting_bool: {
+        Args: {
+          key_name: string
+        }
+        Returns: boolean
+      }
+      get_setting_int: {
+        Args: {
+          key_name: string
+        }
+        Returns: number
+      }
     }
     Enums: {
       booking_kind: 'package' | 'drop_in'
