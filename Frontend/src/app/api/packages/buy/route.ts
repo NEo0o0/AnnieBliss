@@ -2,8 +2,17 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/utils/supabase/server';
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as { packageId?: number } | null;
+  const body = (await request.json().catch(() => null)) as { 
+    packageId?: number;
+    paymentMethod?: string;
+    paymentNote?: string;
+    paymentSlipUrl?: string;
+  } | null;
+  
   const packageId = Number(body?.packageId);
+  const paymentMethod = body?.paymentMethod;
+  const paymentNote = body?.paymentNote;
+  const paymentSlipUrl = body?.paymentSlipUrl;
 
   if (!Number.isFinite(packageId)) {
     return NextResponse.json({ error: 'Invalid package id' }, { status: 400 });
@@ -20,10 +29,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Fetch package details (bundles only: packages table should not include drop-in).
+  // Fetch package details
   const { data: pkg, error: pkgError } = await supabase
     .from('packages')
-    .select('id, credits, duration_days, type, is_active')
+    .select('id, credits, duration_days, type, is_active, price')
     .eq('id', packageId)
     .single();
 
@@ -39,19 +48,42 @@ export async function POST(request: Request) {
   const expire = new Date(now);
   expire.setDate(expire.getDate() + (pkg.duration_days ?? 0));
 
-  const { error: createError } = await supabase.from('user_packages').insert({
-    user_id: user.id,
-    package_id: pkg.id,
-    credits_remaining: pkg.type === 'credits' ? pkg.credits : null,
-    start_at: now.toISOString(),
-    activated_at: now.toISOString(),
-    expire_at: expire.toISOString(),
-    status: 'active',
-  });
+  // Create user package with pending_activation status
+  // Admin will activate after verifying payment
+  const { data: userPackage, error: createError } = await supabase
+    .from('user_packages')
+    .insert({
+      user_id: user.id,
+      package_id: pkg.id,
+      credits_remaining: pkg.type === 'credit' ? pkg.credits : null,
+      start_at: now.toISOString(),
+      activated_at: null, // Not activated yet
+      expire_at: expire.toISOString(),
+      status: 'pending_activation', // Pending until admin verifies payment
+    })
+    .select()
+    .single();
 
   if (createError) {
     return NextResponse.json({ error: createError.message }, { status: 400 });
   }
 
-  return NextResponse.json({ ok: true });
+  // Create payment record
+  const { error: paymentError } = await supabase.from('payments').insert({
+    user_id: user.id,
+    user_package_id: userPackage.id,
+    amount: pkg.price || 0,
+    method: (paymentMethod as 'cash' | 'bank_transfer' | 'promptpay' | 'card' | 'other') || 'bank_transfer',
+    log_status: 'recorded',
+    paid_at: now.toISOString(),
+    note: paymentNote || null,
+    evidence_url: paymentSlipUrl || null,
+  });
+
+  if (paymentError) {
+    console.error('Payment record error:', paymentError);
+    // Don't fail the request if payment record fails
+  }
+
+  return NextResponse.json({ ok: true, userPackageId: userPackage.id });
 }

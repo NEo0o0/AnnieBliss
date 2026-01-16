@@ -5,6 +5,7 @@ import { MemberDetailsModal } from './MemberDetailsModal';
 import { AssignPackageModal } from './AssignPackageModal';
 import { EditProfileModal } from './EditProfileModal';
 import { ConfirmationModal } from './ConfirmationModal';
+import { Avatar } from './Avatar';
 import { toast } from 'sonner';
 
 type FilterType = 'all' | 'unlimited' | 'class-pack' | 'drop-in' | 'instructors';
@@ -24,6 +25,7 @@ interface Member {
   creditsLeft?: number;
   totalCredits?: number;
   expiryDate?: string;
+  avatarUrl?: string | null;
 }
 
 export function MembersManagement() {
@@ -80,7 +82,7 @@ export function MembersManagement() {
       console.log('Fetching profiles...');
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, full_name, phone, role, created_at')
+        .select('id, full_name, phone, role, created_at, avatar_url')
         .order('full_name');
 
       if (profilesError) {
@@ -182,6 +184,7 @@ export function MembersManagement() {
           creditsLeft: activePackage?.credits_remaining,
           totalCredits: packageInfo?.credits,
           expiryDate,
+          avatarUrl: profile.avatar_url,
         };
       });
 
@@ -403,9 +406,12 @@ export function MembersManagement() {
                 <tr key={member.id} className="hover:bg-[var(--color-cream)]/50 transition-colors duration-150">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--color-sage)] to-[var(--color-clay)] flex items-center justify-center text-white text-sm">
-                        {member.fullName.charAt(0).toUpperCase()}
-                      </div>
+                      <Avatar 
+                        src={member.avatarUrl}
+                        alt={member.fullName}
+                        size="md"
+                        fallbackText={member.fullName}
+                      />
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-[var(--color-earth-dark)]">{member.fullName}</span>

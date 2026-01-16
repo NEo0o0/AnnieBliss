@@ -585,6 +585,8 @@ export function WeeklySchedule({ onNavigate, initialClasses }: WeeklySchedulePro
             room: selectedClass.location || 'Studio A',
             price: selectedClass.price ?? (selectedClass as any).class_type?.price ?? 0,
             cover_image_url: (selectedClass as any).cover_image_url || null,
+            gallery_images: (selectedClass as any).gallery_images || null,
+            class_types: (selectedClass as any).class_types || null,
           }}
           onClose={() => setSelectedClass(null)}
           onNavigate={onNavigate}

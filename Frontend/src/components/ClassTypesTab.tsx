@@ -5,6 +5,8 @@ import { Plus, Edit2, Trash2, X, Check, Sparkles } from 'lucide-react';
 import { useClassTypes } from '../hooks';
 import type { Tables } from '../types/database.types';
 import { ConfirmationModal } from './ConfirmationModal';
+import { ImageUpload } from './ImageUpload';
+import { MultiImageUpload } from './MultiImageUpload';
 import { toast } from 'sonner';
 
 type ClassType = Tables<'class_types'>;
@@ -20,7 +22,9 @@ export function ClassTypesTab() {
     level: 'All Levels',
     duration_minutes: 60,
     color_code: '#8CA899', // Default sage color
-    default_price: 25.00
+    default_price: 25.00,
+    cover_image_url: '',
+    gallery_images: [] as string[]
   });
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -36,7 +40,9 @@ export function ClassTypesTab() {
       level: 'All Levels',
       duration_minutes: 60,
       color_code: '#8CA899',
-      default_price: 25.00
+      default_price: 25.00,
+      cover_image_url: '',
+      gallery_images: [] as string[]
     });
     setEditingId(null);
     setShowForm(false);
@@ -75,7 +81,9 @@ export function ClassTypesTab() {
       level: classType.level || 'All Levels',
       duration_minutes: classType.duration_minutes || 60,
       color_code: classType.color_code || '#8CA899',
-      default_price: classType.default_price || 25.00
+      default_price: classType.default_price || 25.00,
+      cover_image_url: (classType as any).cover_image_url || '',
+      gallery_images: (classType as any).gallery_images || []
     });
     setEditingId(classType.id);
     setShowForm(true);
@@ -328,6 +336,36 @@ export function ClassTypesTab() {
                 />
               </div>
 
+              {/* Cover Image */}
+              <div>
+                <label className="block text-sm text-[var(--color-stone)] mb-2">
+                  Cover Image (Optional)
+                </label>
+                <ImageUpload
+                  currentImageUrl={formData.cover_image_url}
+                  onUpload={(url) => {
+                    setFormData({ ...formData, cover_image_url: url });
+                  }}
+                />
+              </div>
+
+              {/* Gallery Images */}
+              <div>
+                <label className="block text-sm text-[var(--color-stone)] mb-2">
+                  Gallery Images (Optional)
+                </label>
+                <p className="text-xs text-[var(--color-stone)] mb-3">
+                  Upload multiple images to showcase this class type in a gallery slideshow
+                </p>
+                <MultiImageUpload
+                  images={formData.gallery_images}
+                  onImagesChange={(images) => {
+                    setFormData({ ...formData, gallery_images: images });
+                  }}
+                  maxImages={10}
+                />
+              </div>
+
               {/* Actions */}
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--color-sand)]">
                 <button
@@ -339,10 +377,11 @@ export function ClassTypesTab() {
                 </button>
                 <button
                   type="submit"
+                  disabled={submitting}
                   className="bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg"
                 >
                   <Check size={20} />
-                  <span>{editingId ? 'Update Class Type' : 'Create Class Type'}</span>
+                  <span>{submitting ? 'Saving...' : (editingId ? 'Update Class Type' : 'Create Class Type')}</span>
                 </button>
               </div>
             </form>

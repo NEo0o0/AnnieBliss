@@ -1,7 +1,11 @@
  "use client";
 
-import { X, Clock, Calendar, MapPin, DollarSign, Users, Tag } from 'lucide-react';
-import { useApp } from '../context/AppContext';
+import { X, Clock, Calendar, MapPin, DollarSign, Users, Tag, UserPlus } from 'lucide-react';
+import { useState } from 'react';
+import { useAuth } from '../hooks/useAuth';
+import { useBookings } from '../hooks/useBookings';
+import { ImageCarousel } from './ImageCarousel';
+import { PaymentMethodSelector } from './PaymentMethodSelector';
 
 interface EventDetailModalProps {
   event: {
@@ -15,20 +19,114 @@ interface EventDetailModalProps {
     location: string;
     excerpt: string;
     category: string;
+    gallery_images?: string[] | null;
   };
   onClose: () => void;
   onNavigate: (page: string) => void;
 }
 
 export function EventDetailModal({ event, onClose, onNavigate }: EventDetailModalProps) {
-  const { isLoggedIn } = useApp();
+  const { user, profile } = useAuth();
+  const { createBooking } = useBookings({ autoFetch: false });
+  const [showPaymentSelector, setShowPaymentSelector] = useState(false);
+  const [showManualBooking, setShowManualBooking] = useState(false);
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [bookingSuccess, setBookingSuccess] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
+  const [guestName, setGuestName] = useState('');
+  const [guestContact, setGuestContact] = useState('');
+  const [paymentReceived, setPaymentReceived] = useState(false);
 
+  const isAdmin = profile?.role === 'admin';
   const isPastEvent = new Date(event.starts_at) < new Date();
+  const hasGallery = event.gallery_images && event.gallery_images.length > 0;
+  const workshopPrice = parseFloat(event.price.replace(/[^0-9.]/g, '')) || 0;
 
-  const handleBooking = () => {
-    if (isLoggedIn) {
-      alert(`Successfully registered for ${event.title}! Check your email for confirmation.`);
-      onClose();
+  const handleBookingClick = () => {
+    if (!user) {
+      handleLoginRedirect();
+      return;
+    }
+    setShowPaymentSelector(true);
+  };
+
+  const handlePaymentSelect = async (method: 'package' | 'cash' | 'bank_transfer' | 'promptpay', paymentNote?: string) => {
+    if (!user) return;
+
+    try {
+      setBookingLoading(true);
+      setBookingError(null);
+
+      const bookingData: any = {
+        user_id: user.id,
+        class_id: event.id,
+        kind: 'dropin',
+        amount_due: workshopPrice,
+        payment_method: method,
+        payment_status: 'unpaid',
+        payment_note: paymentNote,
+      };
+
+      const result = await createBooking(bookingData);
+
+      if (result.error) {
+        throw result.error;
+      }
+
+      setBookingSuccess(true);
+      setShowPaymentSelector(false);
+
+      setTimeout(() => {
+        onClose();
+      }, 2000);
+    } catch (err: any) {
+      console.error('Booking error:', err);
+      setBookingError(err.message || 'Failed to register for workshop. Please try again.');
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
+  const handleManualBooking = async () => {
+    if (!guestName || !guestContact) {
+      setBookingError('Please enter guest name and contact information.');
+      return;
+    }
+
+    try {
+      setBookingLoading(true);
+      setBookingError(null);
+
+      const bookingData: any = {
+        class_id: event.id,
+        kind: 'dropin',
+        guest_name: guestName,
+        guest_contact: guestContact,
+        amount_due: workshopPrice,
+        payment_method: 'bank_transfer',
+        payment_status: paymentReceived ? 'paid' : 'unpaid',
+      };
+
+      const result = await createBooking(bookingData);
+
+      if (result.error) {
+        throw result.error;
+      }
+
+      setBookingSuccess(true);
+      setShowManualBooking(false);
+      setGuestName('');
+      setGuestContact('');
+      setPaymentReceived(false);
+
+      setTimeout(() => {
+        onClose();
+      }, 2000);
+    } catch (err: any) {
+      console.error('Manual booking error:', err);
+      setBookingError(err.message || 'Failed to create manual booking.');
+    } finally {
+      setBookingLoading(false);
     }
   };
 
@@ -43,32 +141,55 @@ export function EventDetailModal({ event, onClose, onNavigate }: EventDetailModa
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={onClose}>
       <div 
-        className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+        className="relative bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header Image */}
-        <div className="relative h-64 md:h-80 overflow-hidden rounded-t-2xl">
-          <img
-            src={event.image}
-            alt={event.title}
-            className="w-full h-full object-cover"
-          />
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 p-2 bg-black/50 hover:bg-black/70 rounded-full transition-colors duration-300 text-white"
-          >
-            <X size={24} />
-          </button>
-          {/* Category Badge */}
-          <div className="absolute bottom-4 left-4">
-            <span className="inline-flex items-center gap-2 px-4 py-2 bg-white/95 backdrop-blur-sm rounded-full text-sm shadow-lg">
-              <Tag size={16} className="text-[var(--color-sage)]" />
-              {event.category}
-            </span>
-          </div>
-        </div>
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 z-30 p-2 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all duration-200 hover:scale-110"
+          aria-label="Close"
+        >
+          <X size={24} className="text-[var(--color-earth-dark)]" />
+        </button>
+
+        {/* Scrollable Content */}
+        <div className="overflow-y-auto">
+          {/* Gallery Carousel, Header Image, or Placeholder */}
+          {hasGallery ? (
+            <div className="p-6 bg-[var(--color-cream)]">
+              <ImageCarousel images={event.gallery_images!} className="w-full h-96" />
+            </div>
+          ) : isPastEvent ? (
+            <div className="relative h-64 md:h-80 bg-gradient-to-br from-[var(--color-sage)]/10 to-[var(--color-clay)]/10 flex items-center justify-center">
+              <div className="text-center px-8 py-12">
+                <div className="text-6xl mb-4">✨</div>
+                <h3 className="text-2xl font-bold text-[var(--color-earth-dark)] mb-3">
+                  Photos Coming Soon!
+                </h3>
+                <p className="text-[var(--color-stone)] max-w-md mx-auto">
+                  We are currently uploading the event photos. Please check back soon to see the beautiful moments from this workshop!
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="relative h-64 md:h-80 overflow-hidden">
+              <img
+                src={event.image}
+                alt={event.title}
+                className="w-full h-full object-cover"
+              />
+              {/* Category Badge */}
+              <div className="absolute bottom-4 left-4">
+                <span className="inline-flex items-center gap-2 px-4 py-2 bg-white/95 backdrop-blur-sm rounded-full text-sm shadow-lg">
+                  <Tag size={16} className="text-[var(--color-sage)]" />
+                  {event.category}
+                </span>
+              </div>
+            </div>
+          )}
 
         {/* Content */}
         <div className="p-8 space-y-6">
@@ -113,12 +234,14 @@ export function EventDetailModal({ event, onClose, onNavigate }: EventDetailModa
           </div>
 
           {/* Description */}
-          <div>
-            <h3 className="text-[var(--color-earth-dark)] mb-3">About This Event</h3>
-            <p className="text-[var(--color-stone)] leading-relaxed">
-              {event.excerpt}
-            </p>
-          </div>
+          {event.excerpt && (
+            <div>
+              <h3 className="text-lg font-semibold text-[var(--color-earth-dark)] mb-3">About This Event</h3>
+              <p className="text-[var(--color-stone)] leading-relaxed">
+                {event.excerpt}
+              </p>
+            </div>
+          )}
 
           {/* What to Bring */}
           <div className="bg-[var(--color-cream)] p-6 rounded-lg">
@@ -143,6 +266,98 @@ export function EventDetailModal({ event, onClose, onNavigate }: EventDetailModa
             </ul>
           </div>
 
+          {/* Booking Success Message */}
+          {bookingSuccess && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-green-800 text-center font-medium">
+                ✓ Registration confirmed! Check your email for details.
+              </p>
+            </div>
+          )}
+
+          {/* Booking Error Message */}
+          {bookingError && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-800 text-sm">{bookingError}</p>
+            </div>
+          )}
+
+          {/* Payment Method Selector */}
+          {showPaymentSelector && !bookingSuccess && (
+            <div className="mb-6">
+              <PaymentMethodSelector
+                hasActivePackage={false}
+                classPrice={workshopPrice}
+                isWorkshop={true}
+                onSelect={handlePaymentSelect}
+                selectedMethod=""
+              />
+            </div>
+          )}
+
+          {/* Manual Booking Form (Admin Only) */}
+          {showManualBooking && !bookingSuccess && (
+            <div className="mb-6 p-6 bg-[var(--color-cream)] rounded-lg border-2 border-[var(--color-sage)]">
+              <h3 className="text-lg font-semibold text-[var(--color-earth-dark)] mb-4 flex items-center gap-2">
+                <UserPlus size={20} />
+                Manual Guest Registration
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-stone)] mb-2">
+                    Guest Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    placeholder="Enter guest full name"
+                    className="w-full px-4 py-2 border border-[var(--color-sand)] rounded-lg focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-stone)] mb-2">
+                    Contact (Phone/Email) *
+                  </label>
+                  <input
+                    type="text"
+                    value={guestContact}
+                    onChange={(e) => setGuestContact(e.target.value)}
+                    placeholder="Phone number or email"
+                    className="w-full px-4 py-2 border border-[var(--color-sand)] rounded-lg focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent"
+                  />
+                </div>
+                <div className="flex items-center gap-3 p-4 bg-white rounded-lg border border-[var(--color-sand)]">
+                  <input
+                    type="checkbox"
+                    id="paymentReceived"
+                    checked={paymentReceived}
+                    onChange={(e) => setPaymentReceived(e.target.checked)}
+                    className="w-5 h-5 text-[var(--color-sage)] rounded focus:ring-2 focus:ring-[var(--color-sage)]"
+                  />
+                  <label htmlFor="paymentReceived" className="text-sm text-[var(--color-earth-dark)] cursor-pointer">
+                    Payment Received (฿{workshopPrice.toLocaleString()})
+                  </label>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowManualBooking(false)}
+                    className="flex-1 px-4 py-3 border-2 border-[var(--color-sand)] rounded-lg hover:border-[var(--color-sage)] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleManualBooking}
+                    disabled={bookingLoading}
+                    className="flex-1 px-4 py-3 bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {bookingLoading ? 'Creating...' : 'Create Booking'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Booking Section */}
           <div className="border-t border-[var(--color-sand)] pt-6">
             {isPastEvent ? (
@@ -153,31 +368,58 @@ export function EventDetailModal({ event, onClose, onNavigate }: EventDetailModa
                 <Users size={20} />
                 <span className="text-lg">Registration Closed</span>
               </button>
-            ) : isLoggedIn ? (
-              <button
-                onClick={handleBooking}
-                className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white py-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105"
-              >
-                <Users size={20} />
-                <span className="text-lg">Book Workshop</span>
-              </button>
             ) : (
               <div className="space-y-3">
-                <button
-                  onClick={handleLoginRedirect}
-                  className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white py-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105"
-                >
-                  <span className="text-lg">Login to Book</span>
-                </button>
-                <p className="text-center text-[var(--color-stone)] text-sm">
-                  Or{' '}
+                {user && !showPaymentSelector && !showManualBooking ? (
                   <button
-                    onClick={handleContactRedirect}
-                    className="text-[var(--color-sage)] hover:text-[var(--color-clay)] underline transition-colors duration-300"
+                    onClick={handleBookingClick}
+                    disabled={bookingLoading || bookingSuccess}
+                    className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white py-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105"
                   >
-                    contact us to book manually
+                    <Users size={20} />
+                    <span className="text-lg">Register for Workshop</span>
                   </button>
-                </p>
+                ) : !user && !showPaymentSelector && !showManualBooking ? (
+                  <>
+                    <button
+                      onClick={handleLoginRedirect}
+                      className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white py-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105"
+                    >
+                      <span className="text-lg">Login to Register</span>
+                    </button>
+                    <p className="text-center text-[var(--color-stone)] text-sm">
+                      Or{' '}
+                      <button
+                        onClick={handleContactRedirect}
+                        className="text-[var(--color-sage)] hover:text-[var(--color-clay)] underline transition-colors duration-300"
+                      >
+                        contact us to book manually
+                      </button>
+                    </p>
+                  </>
+                ) : null}
+
+                {isAdmin && !showPaymentSelector && !showManualBooking && !bookingSuccess && (
+                  <button
+                    onClick={() => setShowManualBooking(true)}
+                    className="w-full border-2 border-[var(--color-sage)] text-[var(--color-sage)] hover:bg-[var(--color-sage)] hover:text-white py-3 rounded-lg transition-all duration-300 flex items-center justify-center gap-2"
+                  >
+                    <UserPlus size={20} />
+                    <span>Manual Register (Guest)</span>
+                  </button>
+                )}
+
+                {(showPaymentSelector || showManualBooking) && !bookingSuccess && (
+                  <button
+                    onClick={() => {
+                      setShowPaymentSelector(false);
+                      setShowManualBooking(false);
+                    }}
+                    className="w-full border-2 border-[var(--color-sand)] hover:border-[var(--color-sage)] text-[var(--color-earth-dark)] py-3 rounded-lg transition-all duration-300"
+                  >
+                    Back
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -188,6 +430,7 @@ export function EventDetailModal({ event, onClose, onNavigate }: EventDetailModa
               💡 <strong>Limited spots available.</strong> Pre-registration required. Cancellation policy: Full refund up to 48 hours before event.
             </p>
           </div>
+        </div>
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { X, Clock, DollarSign, TrendingUp } from 'lucide-react';
+import { ImageCarousel } from './ImageCarousel';
 
 interface ClassTemplateDetailsModalProps {
   templateData: {
@@ -10,6 +11,7 @@ interface ClassTemplateDetailsModalProps {
     duration_minutes: number | null;
     default_price: number | null;
     cover_image_url?: string | null;
+    gallery_images?: string[] | null;
     color_code?: string | null;
   };
   onClose: () => void;
@@ -38,8 +40,12 @@ export function ClassTemplateDetailsModal({ templateData, onClose }: ClassTempla
 
         {/* Scrollable Content */}
         <div className="overflow-y-auto">
-          {/* Cover Image Banner */}
-          {templateData.cover_image_url ? (
+          {/* Gallery Carousel or Cover Image Banner */}
+          {templateData.gallery_images && templateData.gallery_images.length > 0 ? (
+            <div className="p-6 bg-[var(--color-cream)]">
+              <ImageCarousel images={templateData.gallery_images} className="w-full h-96" />
+            </div>
+          ) : templateData.cover_image_url ? (
             <div className="relative w-full h-64 bg-gradient-to-br from-[var(--color-sage)] to-[var(--color-clay)]">
               <img
                 src={templateData.cover_image_url}

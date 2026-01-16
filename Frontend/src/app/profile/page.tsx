@@ -4,8 +4,8 @@ import { createSupabaseServerClient } from '@/utils/supabase/server';
 import type { Tables } from '@/types/database.types';
 import { ProfileTabs } from './ProfileTabs';
 import { LogoutButton } from './LogoutButton';
-import { CancelBookingButton } from './CancelBookingButton';
-import { BuyPackageButton } from './BuyPackageButton';
+import { ProfileClient } from './ProfileClient';
+import { BundlesClient } from './BundlesClient';
 
 type ProfileRow = Tables<'profiles'>;
 type BookingRow = Tables<'bookings'>;
@@ -113,72 +113,11 @@ export default async function ProfilePage() {
           <div className="mt-8">
             <ProfileTabs
               bookings={
-                <div className="space-y-10">
-                  <section>
-                    <h2 className="text-lg text-[var(--color-earth-dark)] mb-4">Upcoming</h2>
-                    {upcoming.length === 0 ? (
-                      <div className="text-[var(--color-stone)] bg-[var(--color-cream)]/40 border border-[var(--color-sand)] rounded-xl p-6">
-                        No upcoming bookings found.
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {upcoming.map((b) => (
-                          <div
-                            key={b.id}
-                            className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border border-[var(--color-sand)] rounded-xl hover:shadow-md transition-all duration-300"
-                          >
-                            <div>
-                              <div className="text-[var(--color-earth-dark)] font-medium">
-                                {b.classes?.title}
-                              </div>
-                              <div className="text-sm text-[var(--color-stone)] mt-1">
-                                {b.classes?.starts_at ? formatDateTime(b.classes.starts_at) : ''}
-                                {b.classes?.location ? ` • ${b.classes.location}` : ''}
-                              </div>
-                              <div className="mt-2 text-xs text-[var(--color-stone)]">
-                                Status: <span className="font-medium">{b.status}</span>
-                              </div>
-                            </div>
-                            <div className="mt-4 sm:mt-0">
-                              {b.status === 'booked' ? <CancelBookingButton bookingId={b.id} /> : null}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </section>
-
-                  <section>
-                    <h2 className="text-lg text-[var(--color-earth-dark)] mb-4">Past</h2>
-                    {past.length === 0 ? (
-                      <div className="text-[var(--color-stone)] bg-[var(--color-cream)]/40 border border-[var(--color-sand)] rounded-xl p-6">
-                        No past bookings found.
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {past.map((b) => (
-                          <div
-                            key={b.id}
-                            className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border border-[var(--color-sand)] rounded-xl bg-[var(--color-cream)]/20"
-                          >
-                            <div>
-                              <div className="text-[var(--color-earth-dark)] font-medium">
-                                {b.classes?.title}
-                              </div>
-                              <div className="text-sm text-[var(--color-stone)] mt-1">
-                                {b.classes?.starts_at ? formatDateTime(b.classes.starts_at) : ''}
-                                {b.classes?.location ? ` • ${b.classes.location}` : ''}
-                              </div>
-                              <div className="mt-2 text-xs text-[var(--color-stone)]">
-                                Status: <span className="font-medium">{b.status}</span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </section>
-                </div>
+                <ProfileClient
+                  userId={user.id}
+                  upcoming={upcoming}
+                  past={past}
+                />
               }
               packages={
                 <div className="space-y-4">
@@ -219,36 +158,11 @@ export default async function ProfilePage() {
                 </div>
               }
               bundles={
-                <div className="space-y-4">
-                  {(bundles ?? []).length === 0 ? (
-                    <div className="text-[var(--color-stone)] bg-[var(--color-cream)]/40 border border-[var(--color-sand)] rounded-xl p-6">
-                      No bundles available.
-                    </div>
-                  ) : (
-                    (bundles ?? []).map((pkg) => (
-                      <div
-                        key={pkg.id}
-                        className="p-4 border border-[var(--color-sand)] rounded-xl hover:shadow-md transition-all duration-300"
-                      >
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                          <div>
-                            <div className="text-[var(--color-earth-dark)] font-medium">{pkg.name}</div>
-                            <div className="text-sm text-[var(--color-stone)] mt-1">
-                              {pkg.type === 'credits'
-                                ? `${pkg.credits ?? 0} class credits`
-                                : `Unlimited for ${pkg.duration_days} days`}
-                              {pkg.price ? ` • ฿${pkg.price.toLocaleString()}` : ''}
-                            </div>
-                          </div>
-                          <BuyPackageButton packageId={pkg.id} />
-                        </div>
-                      </div>
-                    ))
-                  )}
-                  <div className="text-xs text-[var(--color-stone)] mt-2">
-                    Drop-in is not sold here. Drop-in payments happen during booking in the Schedule flow.
-                  </div>
-                </div>
+                <BundlesClient
+                  bundles={bundles ?? []}
+                  activePackages={activePackages}
+                  userId={user.id}
+                />
               }
             />
           </div>

@@ -110,11 +110,15 @@ async function initAuthOnce() {
       return;
     }
 
+    // Stale-while-revalidate: Keep existing profile visible during refresh
+    // Only show loading if we don't have a profile yet
+    const hasProfile = cachedAuthState.profile !== null;
+    
     emitAuthState({
       ...cachedAuthState,
       user: session.user,
       session,
-      loading: true,
+      loading: !hasProfile, // Only show loading if no profile exists
       error: null,
     });
 

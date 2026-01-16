@@ -1,7 +1,10 @@
-import { X, Clock, User, MapPin, Calendar, DollarSign } from 'lucide-react';
-import { useState } from 'react';
+import { X, Clock, User, MapPin, Calendar, DollarSign, CheckCircle2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useBookings } from '../hooks/useBookings';
+import { ImageCarousel } from './ImageCarousel';
+import { PaymentMethodSelector } from './PaymentMethodSelector';
+import { sendBookingConfirmationEmail } from '../utils/emailHelpers';
 
 interface ClassDetailsModalProps {
   classData: {
@@ -20,6 +23,10 @@ interface ClassDetailsModalProps {
     room: string;
     price: number;
     cover_image_url?: string | null;
+    gallery_images?: string[] | null;
+    class_types?: {
+      cover_image_url?: string | null;
+    };
   };
   onClose: () => void;
   onNavigate: (page: string) => void;
@@ -28,34 +35,122 @@ interface ClassDetailsModalProps {
 
 export function ClassDetailsModal({ classData, onClose, onNavigate, onBookingSuccess }: ClassDetailsModalProps) {
   const { user } = useAuth();
-  const { createBooking } = useBookings({ autoFetch: false });
+  const { createBooking, checkUserPackage, checkExistingBooking } = useBookings({ autoFetch: false });
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [bookingSuccess, setBookingSuccess] = useState(false);
+  const [showPaymentSelector, setShowPaymentSelector] = useState(false);
+  const [userPackage, setUserPackage] = useState<any>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
+  const [existingBooking, setExistingBooking] = useState<any>(null);
+  const [checkingBooking, setCheckingBooking] = useState(true);
+  const [loadingPackageData, setLoadingPackageData] = useState(true);
+  const [dataLoadError, setDataLoadError] = useState<string | null>(null);
 
-  const handleBooking = async () => {
+  useEffect(() => {
+    const loadData = async () => {
+      if (user) {
+        setLoadingPackageData(true);
+        setDataLoadError(null);
+        
+        try {
+          // Load package data
+          const pkg = await checkUserPackage(user.id);
+          console.log('📦 User package data:', pkg);
+          console.log('📦 Has active package:', !!pkg);
+          console.log('📦 Credits remaining:', pkg?.credits_remaining);
+          console.log('📦 Package name:', pkg?.name);
+          setUserPackage(pkg);
+          
+          // Check if user already has a booking for this class
+          const booking = await checkExistingBooking(user.id, parseInt(classData.id));
+          setExistingBooking(booking);
+          setCheckingBooking(false);
+          setLoadingPackageData(false);
+        } catch (error) {
+          console.error('❌ Error loading package data:', error);
+          setDataLoadError('Failed to load package information. Please try again.');
+          setLoadingPackageData(false);
+          setCheckingBooking(false);
+        }
+      } else {
+        setCheckingBooking(false);
+        setLoadingPackageData(false);
+      }
+    };
+    
+    loadData();
+  }, [user, classData.id]);
+
+  const handleBookingClick = () => {
     if (!user) {
       handleLoginRedirect();
       return;
     }
+    // Prevent booking if already booked
+    if (existingBooking) {
+      return;
+    }
+    // Ensure data is loaded before showing payment selector
+    if (loadingPackageData) {
+      console.log('⏳ Still loading package data, please wait...');
+      return;
+    }
+    setShowPaymentSelector(true);
+  };
+
+  const handlePaymentSelect = async (method: 'package' | 'cash' | 'bank_transfer' | 'promptpay', paymentNote?: string, slipUrl?: string) => {
+    if (!user) return;
 
     try {
       setBookingLoading(true);
       setBookingError(null);
+      setSelectedPaymentMethod(method);
 
-      const result = await createBooking({
+      const bookingData: any = {
         user_id: user.id,
         class_id: parseInt(classData.id),
-        kind: 'drop_in',
-        status: 'booked',
         amount_due: classData.price,
-      });
+      };
+
+      if (method === 'package') {
+        // Package booking - payment_status is 'paid' immediately
+        bookingData.kind = 'package';
+        bookingData.payment_status = 'paid';
+        bookingData.payment_method = 'package';
+        bookingData.user_package_id = userPackage?.id;
+      } else {
+        // Transfer/Cash/PromptPay - payment_status is 'unpaid' initially
+        bookingData.kind = 'dropin';
+        bookingData.payment_method = method;
+        bookingData.payment_status = 'unpaid';
+        bookingData.payment_note = paymentNote;
+        bookingData.payment_slip_url = slipUrl;
+      }
+
+      const result = await createBooking(bookingData);
 
       if (result.error) {
         throw result.error;
       }
 
       setBookingSuccess(true);
+      setShowPaymentSelector(false);
+      // Update existing booking state to prevent re-booking
+      setExistingBooking(result.data);
+
+      // Send booking confirmation email
+      if (user && result.data) {
+        const packageInfo = method === 'package' && userPackage ? {
+          name: userPackage.name,
+          creditsRemaining: userPackage.credits_remaining,
+          isUnlimited: userPackage.is_unlimited
+        } : undefined;
+        
+        sendBookingConfirmationEmail(user, result.data, classData, packageInfo).catch(err => {
+          console.error('Failed to send confirmation email:', err);
+        });
+      }
 
       if (onBookingSuccess) {
         onBookingSuccess();
@@ -104,15 +199,18 @@ export function ClassDetailsModal({ classData, onClose, onNavigate, onBookingSuc
 
         {/* Scrollable Content */}
         <div className="overflow-y-auto">
-          {/* Cover Image Banner */}
-          {classData.cover_image_url ? (
+          {/* Gallery Carousel or Cover Image Banner */}
+          {classData.gallery_images && classData.gallery_images.length > 0 ? (
+            <div className="p-6 bg-[var(--color-cream)]">
+              <ImageCarousel images={classData.gallery_images} className="w-full h-96" />
+            </div>
+          ) : (classData.cover_image_url || classData.class_types?.cover_image_url) ? (
             <div className="relative w-full h-64 bg-gradient-to-br from-[var(--color-sage)] to-[var(--color-clay)]">
               <img
-                src={classData.cover_image_url}
+                src={classData.cover_image_url || classData.class_types?.cover_image_url || ''}
                 alt={classData.title}
                 className="w-full h-full object-cover"
                 onError={(e) => {
-                  // Fallback to gradient if image fails to load
                   e.currentTarget.style.display = 'none';
                 }}
               />
@@ -210,6 +308,31 @@ export function ClassDetailsModal({ classData, onClose, onNavigate, onBookingSuc
               </div>
             </div>
 
+            {/* Already Booked Banner */}
+            {existingBooking && !checkingBooking && (
+              <div className="mb-6 p-5 bg-gradient-to-r from-[var(--color-sage)]/10 to-[var(--color-clay)]/10 border-2 border-[var(--color-sage)] rounded-xl shadow-sm">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-[var(--color-sage)] to-[var(--color-clay)] rounded-full flex items-center justify-center shadow-md">
+                    <CheckCircle2 size={24} className="text-white" strokeWidth={2.5} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[var(--color-earth-dark)] font-bold text-lg mb-1">
+                      Already Booked ✓
+                    </p>
+                    <p className="text-[var(--color-stone)] text-sm leading-relaxed">
+                      You have an active booking for this class. View your booking details and payment status in your profile.
+                    </p>
+                    <a 
+                      href="/profile" 
+                      className="inline-block mt-3 text-sm text-[var(--color-sage)] hover:text-[var(--color-clay)] font-medium underline transition-colors"
+                    >
+                      Go to My Bookings →
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Description */}
             <div className="mb-6">
               <h3 className="text-lg font-semibold text-[var(--color-earth-dark)] mb-3">
@@ -241,6 +364,13 @@ export function ClassDetailsModal({ classData, onClose, onNavigate, onBookingSuc
               </div>
             )}
 
+            {/* Data Loading Error */}
+            {dataLoadError && (
+              <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <p className="text-orange-800 text-sm">⚠️ {dataLoadError}</p>
+              </div>
+            )}
+
             {/* Booking Error Message */}
             {bookingError && (
               <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -248,28 +378,74 @@ export function ClassDetailsModal({ classData, onClose, onNavigate, onBookingSuc
               </div>
             )}
 
+            {/* Loading Package Data */}
+            {loadingPackageData && user && (
+              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                  <p className="text-blue-800 text-sm">Loading payment options...</p>
+                </div>
+              </div>
+            )}
+
+            {/* Payment Method Selector */}
+            {showPaymentSelector && !bookingSuccess && !loadingPackageData && (
+              <div className="mb-6">
+                <PaymentMethodSelector
+                  hasActivePackage={!!userPackage}
+                  packageName={userPackage?.name}
+                  creditsRemaining={userPackage?.credits_remaining}
+                  isUnlimited={userPackage?.is_unlimited || false}
+                  classPrice={classData.price}
+                  isWorkshop={false}
+                  itemName={classData.title}
+                  onSelect={handlePaymentSelect}
+                  selectedMethod={selectedPaymentMethod}
+                  userId={user?.id}
+                  userFullName={user?.user_metadata?.full_name}
+                />
+              </div>
+            )}
+
             {/* Action Buttons */}
             <div className="flex gap-4">
               {user ? (
-                <button
-                  onClick={handleBooking}
-                  disabled={bookingLoading || bookingSuccess || isFull}
-                  className={`flex-1 py-4 rounded-lg font-medium transition-all duration-300 shadow-md hover:shadow-lg ${
-                    bookingSuccess
-                      ? 'bg-green-500 text-white cursor-default'
+                !showPaymentSelector ? (
+                  <button
+                    onClick={handleBookingClick}
+                    disabled={bookingLoading || bookingSuccess || isFull || existingBooking || loadingPackageData}
+                    className={`flex-1 py-4 rounded-lg font-medium transition-all duration-300 shadow-md hover:shadow-lg ${
+                      bookingSuccess
+                        ? 'bg-green-500 text-white cursor-default'
+                        : existingBooking
+                        ? 'bg-blue-300 text-blue-800 cursor-not-allowed'
+                        : isFull
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : loadingPackageData
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white'
+                    }`}
+                  >
+                    {loadingPackageData
+                      ? 'Loading...'
+                      : bookingLoading
+                      ? 'Booking...'
+                      : bookingSuccess
+                      ? 'Booked ✓'
+                      : existingBooking
+                      ? 'Already Booked'
                       : isFull
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white'
-                  }`}
-                >
-                  {bookingLoading
-                    ? 'Booking...'
-                    : bookingSuccess
-                    ? 'Booked ✓'
-                    : isFull
-                    ? 'Fully Booked'
-                    : 'Book This Class'}
-                </button>
+                      ? 'Fully Booked'
+                      : 'Book This Class'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setShowPaymentSelector(false)}
+                    className="flex-1 py-4 border-2 border-[var(--color-sand)] hover:border-[var(--color-sage)] text-[var(--color-earth-dark)] rounded-lg font-medium transition-all duration-300"
+                  >
+                    Back
+                  </button>
+                )
               ) : (
                 <button
                   onClick={handleLoginRedirect}

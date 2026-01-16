@@ -2,11 +2,12 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useMemo } from 'react';
-import { Calendar, Clock, DollarSign, MapPin, ArrowRight, Loader2, CheckCircle } from 'lucide-react';
+import { Calendar, Clock, DollarSign, MapPin, ArrowRight, Loader2, CheckCircle, Camera } from 'lucide-react';
 import { EventDetailModal } from './EventDetailModal';
 import { PastEventModal } from './PastEventModal';
+import { GalleryManagementModal } from './GalleryManagementModal';
 import { supabase } from '../utils/supabase/client';
-
+import { useAuth } from '../hooks/useAuth';
 import { useWorkshops } from '../hooks';
 import { toast } from 'sonner';
 import type { Tables, TablesInsert } from '../types/database.types';
@@ -85,13 +86,17 @@ const formatEvent = (workshop: Workshop) => {
 
 export function WorkshopsEvents({ initialWorkshops }: { initialWorkshops?: Workshop[] }) {
   const router = useRouter();
-  const { workshops, loading, error } = useWorkshops({ initialWorkshops });
+  const { workshops, loading, error, refetch } = useWorkshops({ initialWorkshops });
+  const { profile } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
   const [selectedEvent, setSelectedEvent] = useState<ReturnType<typeof formatEvent> | null>(null);
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [subscribeSuccess, setSubscribeSuccess] = useState(false);
+  const [editingGallery, setEditingGallery] = useState<Workshop | null>(null);
+
+  const isAdmin = profile?.role === 'admin';
 
   // Split workshops into upcoming and past based on starts_at
   const { upcomingEvents, pastEvents } = useMemo(() => {
@@ -211,6 +216,19 @@ export function WorkshopsEvents({ initialWorkshops }: { initialWorkshops?: Works
                     alt={event.title}
                     className="w-full h-full object-cover hover:scale-110 transition-transform duration-500"
                   />
+                  {/* Admin Edit Gallery Button */}
+                  {isAdmin && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingGallery(event);
+                      }}
+                      className="absolute top-4 left-4 p-2 bg-white/95 hover:bg-white backdrop-blur-sm rounded-full shadow-lg transition-all duration-200 hover:scale-110 group"
+                      title="Edit Gallery"
+                    >
+                      <Camera size={18} className="text-[var(--color-sage)] group-hover:text-[var(--color-clay)]" />
+                    </button>
+                  )}
                   {/* Category Badge */}
                   {event.category && (
                     <div className="absolute top-4 right-4">
@@ -355,6 +373,20 @@ export function WorkshopsEvents({ initialWorkshops }: { initialWorkshops?: Works
         <PastEventModal
           event={selectedEvent}
           onClose={() => setSelectedEvent(null)}
+        />
+      )}
+
+      {/* Gallery Management Modal (Admin Only) */}
+      {editingGallery && (
+        <GalleryManagementModal
+          workshopId={editingGallery.id}
+          workshopTitle={editingGallery.title}
+          currentGalleryImages={editingGallery.gallery_images}
+          onClose={() => setEditingGallery(null)}
+          onSuccess={() => {
+            refetch();
+            setEditingGallery(null);
+          }}
         />
       )}
     </section>

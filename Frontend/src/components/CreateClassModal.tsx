@@ -3,6 +3,8 @@
 import { X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/utils/supabase/client';
+import { ImageUpload } from './ImageUpload';
+import { MultiImageUpload } from './MultiImageUpload';
 import type { Tables, TablesInsert } from '@/types/database.types';
 
 interface CreateClassModalProps {
@@ -52,6 +54,7 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
     description: '',
     long_description: '',
     cover_image_url: '',
+    gallery_images: [] as string[],
     room: ''
   });
 
@@ -481,22 +484,40 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
             />
           </div>
 
-          {/* Cover Image URL */}
+          {/* Cover Image Upload */}
           <div>
             <label className="block text-sm text-[var(--color-stone)] mb-2">
-              Cover Image URL (Optional)
+              Cover Image (Optional)
             </label>
-            <input
-              type="text"
-              name="cover_image_url"
-              value={formData.cover_image_url}
-              onChange={handleChange}
-              placeholder="https://example.com/image.jpg"
-              className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
+            <ImageUpload
+              currentImageUrl={formData.cover_image_url}
+              onUpload={(url) => {
+                setFormData(prev => ({
+                  ...prev,
+                  cover_image_url: url
+                }));
+              }}
             />
-            <p className="mt-1 text-xs text-[var(--color-stone)]">
-              Enter a URL to an image. File upload will be available in a future update.
+          </div>
+
+          {/* Gallery Images */}
+          <div>
+            <label className="block text-sm text-[var(--color-stone)] mb-2">
+              Gallery Images (Optional)
+            </label>
+            <p className="text-xs text-[var(--color-stone)] mb-3">
+              Upload multiple images to showcase this class/workshop in a gallery slideshow
             </p>
+            <MultiImageUpload
+              images={formData.gallery_images}
+              onImagesChange={(images) => {
+                setFormData(prev => ({
+                  ...prev,
+                  gallery_images: images
+                }));
+              }}
+              maxImages={10}
+            />
           </div>
 
           {/* Action Buttons */}

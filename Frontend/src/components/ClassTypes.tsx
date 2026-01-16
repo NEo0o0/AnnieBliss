@@ -77,16 +77,20 @@ export function ClassTypes({ onNavigate }: ClassTypesProps) {
                 }}
               >
                 {/* Thumbnail Image */}
-                <div className="relative h-64 overflow-hidden bg-[var(--color-sand)]">
-                  {(classType as any).image_url ? (
+                <div className="relative h-64 overflow-hidden bg-gradient-to-br from-[var(--color-sage)] to-[var(--color-clay)]">
+                  {classType.cover_image_url ? (
                     <img
-                      src={(classType as any).image_url}
+                      src={classType.cover_image_url}
                       alt={classType.title}
                       className="w-full h-full object-cover hover:scale-110 transition-transform duration-500"
+                      onError={(e) => {
+                        // Hide image on error and show fallback
+                        e.currentTarget.style.display = 'none';
+                      }}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <span className="text-4xl text-[var(--color-stone)]/30">🧘</span>
+                      <span className="text-6xl">🧘</span>
                     </div>
                   )}
                   {/* Level Badge Overlay */}
@@ -153,11 +157,12 @@ export function ClassTypes({ onNavigate }: ClassTypesProps) {
             id: selectedTemplate.id,
             title: selectedTemplate.title,
             description: selectedTemplate.description,
-            long_description: (selectedTemplate as any).long_description || null,
+            long_description: selectedTemplate.long_description || null,
             level: selectedTemplate.level,
             duration_minutes: selectedTemplate.duration_minutes,
             default_price: selectedTemplate.default_price,
-            cover_image_url: (selectedTemplate as any).cover_image_url || null,
+            cover_image_url: selectedTemplate.cover_image_url || null,
+            gallery_images: selectedTemplate.gallery_images || null,
             color_code: selectedTemplate.color_code,
           }}
           onClose={() => setSelectedTemplate(null)}

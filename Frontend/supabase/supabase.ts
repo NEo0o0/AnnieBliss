@@ -143,36 +143,45 @@ export type Database = {
         Row: {
           color: string | null
           color_code: string | null
+          cover_image_url: string | null
           created_at: string | null
           default_price: number | null
           description: string | null
           duration_minutes: number | null
+          gallery_images: string[] | null
           id: number
           level: string | null
+          long_description: string | null
           price: number | null
           title: string
         }
         Insert: {
           color?: string | null
           color_code?: string | null
+          cover_image_url?: string | null
           created_at?: string | null
           default_price?: number | null
           description?: string | null
           duration_minutes?: number | null
+          gallery_images?: string[] | null
           id?: number
           level?: string | null
+          long_description?: string | null
           price?: number | null
           title: string
         }
         Update: {
           color?: string | null
           color_code?: string | null
+          cover_image_url?: string | null
           created_at?: string | null
           default_price?: number | null
           description?: string | null
           duration_minutes?: number | null
+          gallery_images?: string[] | null
           id?: number
           level?: string | null
+          long_description?: string | null
           price?: number | null
           title?: string
         }
@@ -197,6 +206,7 @@ export type Database = {
           is_cancelled: boolean
           level: string | null
           location: string | null
+          long_description: string | null
           price: number | null
           registration_opens_at: string | null
           starts_at: string
@@ -220,6 +230,7 @@ export type Database = {
           is_cancelled?: boolean
           level?: string | null
           location?: string | null
+          long_description?: string | null
           price?: number | null
           registration_opens_at?: string | null
           starts_at: string
@@ -243,6 +254,7 @@ export type Database = {
           is_cancelled?: boolean
           level?: string | null
           location?: string | null
+          long_description?: string | null
           price?: number | null
           registration_opens_at?: string | null
           starts_at?: string

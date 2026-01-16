@@ -4,6 +4,7 @@ import { useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
+import { AppProvider } from '@/context/AppContext';
 
 function pageIdToPath(pageId: string) {
   switch (pageId) {
@@ -56,10 +57,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen">
-      <Navbar currentPage={currentPage} onNavigate={onNavigate} />
-      <main className="pt-20">{children}</main>
-      <Footer onNavigate={onNavigate} />
-    </div>
+    <AppProvider>
+      <div className="min-h-screen">
+        <Navbar currentPage={currentPage} onNavigate={onNavigate} />
+        <main className="pt-20">{children}</main>
+        <Footer onNavigate={onNavigate} />
+      </div>
+    </AppProvider>
   );
 }

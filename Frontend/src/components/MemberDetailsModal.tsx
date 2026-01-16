@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Calendar, Package, GraduationCap, Loader2 } from 'lucide-react';
 import { supabase } from '@/utils/supabase/client';
+import { Avatar } from './Avatar';
 import { toast } from 'sonner';
 
 interface MemberDetailsModalProps {
@@ -45,8 +46,24 @@ export function MemberDetailsModal({ memberId, memberName, isInstructor, onClose
   const [packageHistory, setPackageHistory] = useState<PackageHistoryItem[]>([]);
   const [teachingHistory, setTeachingHistory] = useState<TeachingHistoryItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [memberProfile, setMemberProfile] = useState<{ avatar_url: string | null; phone: string | null } | null>(null);
 
   useEffect(() => {
+    // Fetch member profile data
+    const fetchMemberProfile = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('avatar_url, phone')
+        .eq('id', memberId)
+        .single();
+      
+      if (data) {
+        setMemberProfile(data);
+      }
+    };
+    
+    fetchMemberProfile();
+    
     if (activeTab === 'bookings') {
       fetchBookingHistory();
     } else if (activeTab === 'packages') {
@@ -203,9 +220,19 @@ export function MemberDetailsModal({ memberId, memberName, isInstructor, onClose
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="p-6 border-b border-[var(--color-sand)] flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl text-[var(--color-earth-dark)]">{memberName}</h2>
-            <p className="text-sm text-[var(--color-stone)] mt-1">Member Details</p>
+          <div className="flex items-center gap-4">
+            <Avatar 
+              src={memberProfile?.avatar_url}
+              alt={memberName}
+              size="xl"
+              fallbackText={memberName}
+            />
+            <div>
+              <h2 className="text-2xl text-[var(--color-earth-dark)]">{memberName}</h2>
+              <p className="text-sm text-[var(--color-stone)] mt-1">
+                {memberProfile?.phone || 'Member Details'}
+              </p>
+            </div>
           </div>
           <button
             onClick={onClose}
