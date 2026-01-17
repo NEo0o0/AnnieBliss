@@ -19,6 +19,7 @@ type BookingWithDetails = {
   amount_due: number;
   amount_paid: number;
   created_at: string;
+  paid_at: string | null;
   classes: {
     title: string;
     starts_at: string;
@@ -28,12 +29,12 @@ type BookingWithDetails = {
   } | null;
 };
 
-type FilterType = 'all' | 'pending_verification' | 'unpaid' | 'paid';
+type FilterType = 'all' | 'partial' | 'unpaid' | 'paid';
 
 export function AdminSlipVerification() {
   const [bookings, setBookings] = useState<BookingWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<FilterType>('pending_verification');
+  const [filter, setFilter] = useState<FilterType>('partial');
   const [selectedBooking, setSelectedBooking] = useState<BookingWithDetails | null>(null);
   const { verifyPayment } = useBookings({ autoFetch: false });
 
@@ -46,8 +47,8 @@ export function AdminSlipVerification() {
         .eq('status', 'booked')
         .order('created_at', { ascending: false });
 
-      if (filter === 'pending_verification') {
-        query = query.eq('payment_status', 'pending_verification');
+      if (filter === 'partial') {
+        query = query.eq('payment_status', 'partial');
       } else if (filter === 'unpaid') {
         query = query.eq('payment_status', 'unpaid');
       } else if (filter === 'paid') {
@@ -89,12 +90,21 @@ export function AdminSlipVerification() {
         icon: <CheckCircle size={14} />
       };
     }
-    if (booking.payment_status === 'pending_verification') {
-      return {
-        label: 'Pending Verification',
-        color: 'bg-blue-100 text-blue-800 border-blue-200',
-        icon: <Clock size={14} />
-      };
+    if (booking.payment_status === 'partial') {
+      // Differentiate between verified partial and pending verification
+      if (booking.paid_at) {
+        return {
+          label: 'Partial Paid',
+          color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+          icon: <CheckCircle size={14} />
+        };
+      } else {
+        return {
+          label: 'Pending Verification',
+          color: 'bg-blue-100 text-blue-800 border-blue-200',
+          icon: <Clock size={14} />
+        };
+      }
     }
     if (booking.payment_status === 'unpaid') {
       return {
@@ -112,7 +122,7 @@ export function AdminSlipVerification() {
 
   const filteredBookings = bookings.filter(b => {
     if (filter === 'all') return true;
-    if (filter === 'pending_verification') return b.payment_status === 'pending_verification';
+    if (filter === 'partial') return b.payment_status === 'partial';
     if (filter === 'unpaid') return b.payment_status === 'unpaid';
     if (filter === 'paid') return b.payment_status === 'paid';
     return true;
@@ -139,7 +149,7 @@ export function AdminSlipVerification() {
             className="px-4 py-2 border border-[var(--color-sand)] rounded-lg focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent"
           >
             <option value="all">All Bookings</option>
-            <option value="pending_verification">Pending Verification</option>
+            <option value="partial">Pending Verification</option>
             <option value="unpaid">Unpaid</option>
             <option value="paid">Paid</option>
           </select>
@@ -155,7 +165,7 @@ export function AdminSlipVerification() {
       ) : filteredBookings.length === 0 ? (
         <div className="text-center py-12 bg-[var(--color-cream)]/40 rounded-lg border border-[var(--color-sand)]">
           <p className="text-[var(--color-stone)]">
-            {filter === 'pending_verification' 
+            {filter === 'partial' 
               ? 'No payments pending verification'
               : 'No bookings found'}
           </p>

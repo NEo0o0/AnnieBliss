@@ -46,6 +46,7 @@ export function ClassDetailsModal({ classData, onClose, onNavigate, onBookingSuc
   const [checkingBooking, setCheckingBooking] = useState(true);
   const [loadingPackageData, setLoadingPackageData] = useState(true);
   const [dataLoadError, setDataLoadError] = useState<string | null>(null);
+  const [localEnrolled, setLocalEnrolled] = useState(classData.enrolled);
 
   useEffect(() => {
     const loadData = async () => {
@@ -138,6 +139,9 @@ export function ClassDetailsModal({ classData, onClose, onNavigate, onBookingSuc
       setShowPaymentSelector(false);
       // Update existing booking state to prevent re-booking
       setExistingBooking(result.data);
+      
+      // Immediately update local enrolled count to reflect the new booking
+      setLocalEnrolled(prev => prev + 1);
 
       // Send booking confirmation email
       if (user && result.data) {
@@ -181,7 +185,7 @@ export function ClassDetailsModal({ classData, onClose, onNavigate, onBookingSuc
     onNavigate('login');
   };
 
-  const spotsLeft = classData.capacity - classData.enrolled;
+  const spotsLeft = classData.capacity - localEnrolled;
   const isFull = spotsLeft <= 0;
   const displayPrice = classData.price > 0 ? `฿${classData.price.toLocaleString()}` : 'Free';
 
@@ -303,7 +307,7 @@ export function ClassDetailsModal({ classData, onClose, onNavigate, onBookingSuc
                   className={`h-2 rounded-full transition-all duration-300 ${
                     isFull ? 'bg-red-500' : 'bg-green-500'
                   }`}
-                  style={{ width: `${(classData.enrolled / classData.capacity) * 100}%` }}
+                  style={{ width: `${(localEnrolled / classData.capacity) * 100}%` }}
                 />
               </div>
             </div>

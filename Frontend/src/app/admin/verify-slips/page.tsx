@@ -22,7 +22,7 @@ export default async function VerifySlipsPage() {
     redirect('/');
   }
 
-  // Fetch bookings with pending_verification status
+  // Fetch bookings with partial payment status (awaiting verification)
   const { data: pendingBookings, error } = await supabase
     .from('bookings')
     .select(`
@@ -30,16 +30,16 @@ export default async function VerifySlipsPage() {
       classes (
         id,
         title,
-        start_time,
+        starts_at,
         price
       ),
       profiles (
         id,
         full_name,
-        email
+        phone
       )
     `)
-    .filter('payment_status', 'eq', 'pending_verification')
+    .filter('payment_status', 'eq', 'partial')
     .order('created_at', { ascending: false });
 
   if (error) {

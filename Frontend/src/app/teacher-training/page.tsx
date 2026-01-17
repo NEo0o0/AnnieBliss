@@ -13,10 +13,13 @@ type Training = Tables<'classes'> & {
 export default async function TeacherTrainingPage() {
   const supabase = await createSupabaseServerClient();
 
+  const now = new Date().toISOString();
+
   const { data } = await supabase
     .from('classes')
     .select('*')
     .eq('category', 'Teacher Training')
+    .gte('starts_at', now)
     .order('starts_at', { ascending: true });
 
   const initialTrainings: Training[] = (data ?? []) as unknown as Training[];

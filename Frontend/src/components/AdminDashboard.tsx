@@ -20,6 +20,7 @@ import {
   ChevronDown,
   Mail,
   Loader2,
+  CheckCircle2,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { CreateClassModal } from './CreateClassModal';
@@ -31,6 +32,7 @@ import { TodaysClassesTable } from './TodaysClassesTable';
 import { NewsletterSubscribers } from './NewsletterSubscribers';
 import { AdminBookingModal } from './AdminBookingModal';
 import { ConfirmationModal } from './ConfirmationModal';
+import { VerifySlipsSection } from './VerifySlipsSection';
 import { toast } from 'sonner';
 import { useDashboardStats } from '../hooks/useDashboardStats';
 import { supabase } from '@/utils/supabase/client';
@@ -424,7 +426,7 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
     setBookingsState((prev) => ({
       ...prev,
       [classId]: (prev[classId] || []).map((b: AdminBooking) =>
-        String(b.id) === String(bookingId) ? { ...b, isAttended: nextValue } : b
+        bookingId === b.id ? { ...b, isAttended: nextValue } : b
       ),
     }));
 
@@ -454,7 +456,7 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
       setBookingsState((prev) => ({
         ...prev,
         [classId]: (prev[classId] || []).map((b: AdminBooking) =>
-          String(b.id) === String(bookingId) ? { ...b, isAttended: !nextValue } : b
+          bookingId === b.id ? { ...b, isAttended: !nextValue } : b
         ),
       }));
       const message = e instanceof Error ? e.message : String(e);
@@ -483,7 +485,7 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
     setBookingsState((prev) => ({
       ...prev,
       [classId]: (prev[classId] || []).map((b: AdminBooking) =>
-        String(b.id) === String(bookingId)
+        bookingId === b.id
           ? { ...b, paymentStatus: nextStatus, amountPaid: nextAmountPaid, paidAt: nextPaidAt }
           : b
       ),
@@ -497,7 +499,7 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
       }
 
       // Get booking details for payment record
-      const booking = bookingsState[classId]?.find((b: AdminBooking) => String(b.id) === String(bookingId));
+      const booking = bookingsState[classId]?.find((b: AdminBooking) => b.id === bookingId);
       if (!booking) {
         throw new Error('Booking not found');
       }
@@ -556,7 +558,7 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
       setBookingsState((prev) => ({
         ...prev,
         [classId]: (prev[classId] || []).map((b: AdminBooking) => {
-          if (String(b.id) !== String(bookingId)) return b;
+          if (b.id !== bookingId) return b;
           const revertedStatus = nextStatus === 'paid' ? 'unpaid' : 'paid';
           return {
             ...b,
@@ -650,6 +652,19 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
             >
               <DollarSign size={20} />
               <span>Payments</span>
+            </button>
+          </li>
+          <li>
+            <button
+              onClick={() => handleSectionChange('verify-slips')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ${
+                currentSection === 'verify-slips'
+                  ? 'bg-[var(--color-sage)] text-white'
+                  : 'text-[var(--color-stone)] hover:bg-[var(--color-cream)]'
+              }`}
+            >
+              <CheckCircle2 size={20} />
+              <span>Verify Payment Slips</span>
             </button>
           </li>
           <li>
@@ -994,6 +1009,19 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
         {currentSection === 'classes' && <ClassManagement />}
         {currentSection === 'members' && <MembersManagement />}
         {currentSection === 'payments' && <PaymentsManagement />}
+        {currentSection === 'verify-slips' && (
+          <div className="p-4 md:p-8">
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold text-[var(--color-earth-dark)]">
+                Payment Slip Verification
+              </h1>
+              <p className="text-[var(--color-stone)] mt-2">
+                Review and approve payment slips from users
+              </p>
+            </div>
+            <VerifySlipsSection />
+          </div>
+        )}
         {currentSection === 'reports' && <ReportsAnalytics />}
         {currentSection === 'subscribers' && <NewsletterSubscribers />}
         {currentSection === 'settings' && renderPlaceholder('Settings')}

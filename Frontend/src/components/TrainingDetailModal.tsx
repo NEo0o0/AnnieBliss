@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useBookings } from '../hooks/useBookings';
+import { PaymentMethodSelector } from './PaymentMethodSelector';
 import type { Tables } from '../types/database.types';
 
 type Training = Tables<'classes'> & {
@@ -26,6 +27,8 @@ export function TrainingDetailModal({ training, onClose }: TrainingDetailModalPr
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [paymentOption, setPaymentOption] = useState<'full' | 'plan'>('full');
+  const [showPaymentSelector, setShowPaymentSelector] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
 
   const now = Date.now();
 
@@ -102,7 +105,11 @@ export function TrainingDetailModal({ training, onClose }: TrainingDetailModalPr
     return `฿${amount.toLocaleString()}`;
   };
 
-  const handleBooking = async () => {
+  const handlePaymentMethodSelect = async (
+    method: 'package' | 'cash' | 'bank_transfer' | 'promptpay',
+    paymentNote?: string,
+    slipUrl?: string
+  ) => {
     if (!user) {
       handleLoginRedirect();
       return;
@@ -112,19 +119,25 @@ export function TrainingDetailModal({ training, onClose }: TrainingDetailModalPr
       setBookingLoading(true);
       setBookingError(null);
 
-      // booking_kind enum currently has only: 'package' | 'drop_in'
-      // TODO: if you add a 'training' booking_kind in DB, switch this to 'training'.
+      const paymentStatus = method === 'cash' ? 'unpaid' : 'paid';
+      const paymentMethodValue = method === 'package' ? 'other' : method;
+
       const result = await createBooking({
         user_id: user.id,
         class_id: training.id,
-        kind: 'drop_in',
+        kind: 'dropin',
         status: 'booked',
         amount_due: amountDueToday,
+        payment_method: paymentMethodValue,
+        payment_status: paymentStatus,
+        payment_note: paymentNote,
+        payment_slip_url: slipUrl,
       });
 
       if (result.error) throw result.error;
 
       setBookingSuccess(true);
+      setShowPaymentSelector(false);
       setTimeout(() => {
         onClose();
       }, 2000);
@@ -134,6 +147,15 @@ export function TrainingDetailModal({ training, onClose }: TrainingDetailModalPr
     } finally {
       setBookingLoading(false);
     }
+  };
+
+  const handleBooking = async () => {
+    if (!user) {
+      handleLoginRedirect();
+      return;
+    }
+
+    setShowPaymentSelector(true);
   };
 
   const handleLoginRedirect = () => {
@@ -391,20 +413,41 @@ export function TrainingDetailModal({ training, onClose }: TrainingDetailModalPr
             ) : isEnrollmentOpen ? (
               // Enrollment is open
               user ? (
-                <button
-                  onClick={handleBooking}
-                  disabled={bookingLoading || bookingSuccess}
-                  className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white py-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105"
-                >
-                  <Users size={20} />
-                  <span className="text-lg">
-                    {bookingLoading
-                      ? 'Submitting...'
-                      : bookingSuccess
-                        ? 'Submitted!'
-                        : `Apply / Book Now (${formatMoney(amountDueToday)} due today)`}
-                  </span>
-                </button>
+                showPaymentSelector ? (
+                  <div className="space-y-4">
+                    <PaymentMethodSelector
+                      hasActivePackage={false}
+                      classPrice={amountDueToday}
+                      isWorkshop={true}
+                      itemName={training.title}
+                      onSelect={handlePaymentMethodSelect}
+                      selectedMethod={selectedPaymentMethod}
+                      userId={user.id}
+                      userFullName={user.user_metadata?.full_name || user.email || 'User'}
+                    />
+                    <button
+                      onClick={() => setShowPaymentSelector(false)}
+                      className="w-full py-3 border-2 border-[var(--color-sand)] hover:border-[var(--color-sage)] text-[var(--color-earth-dark)] rounded-lg transition-colors"
+                    >
+                      Back
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleBooking}
+                    disabled={bookingLoading || bookingSuccess}
+                    className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white py-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105"
+                  >
+                    <Users size={20} />
+                    <span className="text-lg">
+                      {bookingLoading
+                        ? 'Submitting...'
+                        : bookingSuccess
+                          ? 'Submitted!'
+                          : `Apply / Book Now (${formatMoney(amountDueToday)} due today)`}
+                    </span>
+                  </button>
+                )
               ) : (
                 <div className="space-y-3">
                   <button

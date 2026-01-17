@@ -64,13 +64,22 @@ const getPaymentStatusBadge = (booking: BookingWithClass) => {
     };
   }
 
-  // Handle pending_verification status (gracefully handle if migration not run yet)
-  if (payment_status === 'pending_verification' as any) {
-    return {
-      label: 'Verifying',
-      color: 'bg-blue-100 text-blue-800 border-blue-200',
-      icon: <Clock size={14} />
-    };
+  // Handle partial payment status
+  if (payment_status === 'partial') {
+    // Differentiate between verified partial and pending verification
+    if (booking.paid_at) {
+      return {
+        label: 'Partial Paid',
+        color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+        icon: <CheckCircle size={14} />
+      };
+    } else {
+      return {
+        label: 'Verifying',
+        color: 'bg-blue-100 text-blue-800 border-blue-200',
+        icon: <Clock size={14} />
+      };
+    }
   }
 
   if (payment_status === 'unpaid') {
@@ -105,7 +114,7 @@ export function ProfileClient({ userId, upcoming, past }: ProfileClientProps) {
         .update({
           payment_slip_url: slipUrl,
           payment_method: 'bank_transfer',
-          payment_status: 'pending_verification' as any // Type assertion for new status
+          payment_status: 'partial'
         })
         .eq('id', bookingId);
 

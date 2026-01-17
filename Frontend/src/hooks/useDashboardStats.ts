@@ -25,16 +25,27 @@ export function useDashboardStats() {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchRevenue = async (): Promise<number> => {
+    // Get current month range
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
     const { data, error: revenueError } = await supabase
       .from('bookings')
-      .select('amount_paid, status')
+      .select('amount_paid, amount_due, status, created_at')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .eq('payment_status' as any, 'paid' as any)
-      .neq('status', 'cancelled');
+      .neq('status', 'cancelled')
+      .gte('created_at', startOfMonth.toISOString())
+      .lte('created_at', endOfMonth.toISOString());
 
     if (revenueError) throw revenueError;
 
-    return (data ?? []).reduce((sum: number, row: any) => sum + Number(row?.amount_paid ?? 0), 0);
+    return (data ?? []).reduce((sum: number, row: any) => {
+      // Use amount_paid if available, otherwise fall back to amount_due
+      const amount = Number(row?.amount_paid ?? row?.amount_due ?? 0);
+      return sum + amount;
+    }, 0);
   };
 
   const fetchActiveMembers = async (): Promise<number> => {

@@ -205,7 +205,7 @@ function generateBookingConfirmationEmail(params: {
   const needsPayment = paymentStatus !== 'paid';
   const statusBadge = paymentStatus === 'paid' || isPackageBooking
     ? '<span style="background: #D1FAE5; color: #065F46; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">✓ Paid</span>'
-    : paymentStatus === 'pending_verification'
+    : paymentStatus === 'partial'
     ? '<span style="background: #DBEAFE; color: #1E40AF; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">⏳ Pending Verification</span>'
     : '<span style="background: #FEF3C7; color: #92400E; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">⚠️ Payment Required</span>';
 
