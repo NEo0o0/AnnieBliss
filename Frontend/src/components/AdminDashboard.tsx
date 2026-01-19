@@ -54,6 +54,7 @@ type AdminBooking = {
   amountPaid?: number;
   paidAt?: string | null;
   isAttended?: boolean;
+  healthCondition?: string | null;
 };
 
 type TodaysClassItem = {
@@ -195,7 +196,7 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
         const { data: bookingsData, error: bookingsError } = await supabase
           .from('bookings')
           .select(
-            'id, class_id, user_id, status, is_attended, payment_status, amount_due, amount_paid, paid_at, guest_name, guest_contact, profiles(full_name)'
+            'id, class_id, user_id, status, is_attended, payment_status, amount_due, amount_paid, paid_at, guest_name, guest_contact, guest_health_condition, guest_avatar_url, profiles(id, full_name, avatar_url, health_condition)'
           )
           .in('class_id', classIds)
           .neq('status', 'cancelled')
@@ -207,7 +208,13 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
         const byClass: Record<number, AdminBooking[]> = {};
         for (const b of bookingsData ?? []) {
           const profile = (b as any).profiles;
-          const fullName = profile?.full_name ?? 'Unnamed';
+          const isGuest = !(b as any).user_id;
+          
+          // Unified name logic: member OR guest
+          const fullName = isGuest 
+            ? ((b as any).guest_name || 'Guest')
+            : (profile?.full_name ?? 'Unnamed');
+          
           const initials = String(fullName)
             .split(' ')
             .filter(Boolean)
@@ -216,13 +223,23 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
             .join('')
             .toUpperCase();
 
+          // Unified avatar logic: member OR guest
+          const avatarUrl = isGuest
+            ? (b as any).guest_avatar_url
+            : profile?.avatar_url;
+
+          // Unified health condition logic: member OR guest
+          const healthCondition = isGuest
+            ? (b as any).guest_health_condition
+            : profile?.health_condition;
+
           const classId = Number((b as any).class_id);
           byClass[classId] = byClass[classId] ?? [];
           byClass[classId].push({
             id: String((b as any).id),
             studentId: String((b as any).user_id ?? ''),
             name: fullName,
-            avatar: initials,
+            avatar: avatarUrl || initials,
             phone: '',
             contactInfo: '',
             contactPlatform: '',
@@ -235,6 +252,7 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
             amountPaid: Number((b as any).amount_paid ?? 0),
             paidAt: ((b as any).paid_at as string | null) ?? null,
             isAttended: Boolean((b as any).is_attended),
+            healthCondition: healthCondition || null,
           });
         }
 

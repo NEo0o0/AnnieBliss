@@ -1,6 +1,6 @@
 'use client';
 
-import { X, Calendar, Clock, MapPin, DollarSign, BookOpen, Check, Users, Bell } from 'lucide-react';
+import { X, Calendar, Clock, MapPin, DollarSign, BookOpen, Check, Users, Bell, UserPlus, Camera, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
@@ -21,7 +21,7 @@ interface TrainingDetailModalProps {
 
 export function TrainingDetailModal({ training, onClose }: TrainingDetailModalProps) {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { createBooking } = useBookings({ autoFetch: false });
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
@@ -29,6 +29,13 @@ export function TrainingDetailModal({ training, onClose }: TrainingDetailModalPr
   const [paymentOption, setPaymentOption] = useState<'full' | 'plan'>('full');
   const [showPaymentSelector, setShowPaymentSelector] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
+  const [showManualBooking, setShowManualBooking] = useState(false);
+  const [guestName, setGuestName] = useState('');
+  const [guestContact, setGuestContact] = useState('');
+  const [guestHealthCondition, setGuestHealthCondition] = useState('');
+  const [guestAvatarUrl, setGuestAvatarUrl] = useState('');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [paymentReceived, setPaymentReceived] = useState(false);
 
   const now = Date.now();
 
@@ -175,6 +182,51 @@ export function TrainingDetailModal({ training, onClose }: TrainingDetailModalPr
       onClose();
     }
   };
+
+  const handleManualBooking = async () => {
+    if (!guestName || !guestContact) {
+      setBookingError('Please enter guest name and contact information.');
+      return;
+    }
+
+    try {
+      setBookingLoading(true);
+      setBookingError(null);
+
+      const result = await createBooking({
+        class_id: training.id,
+        kind: 'dropin',
+        guest_name: guestName,
+        guest_contact: guestContact,
+        guest_health_condition: guestHealthCondition.trim() || null,
+        guest_avatar_url: guestAvatarUrl || null,
+        amount_due: amountDueToday,
+        payment_method: 'bank_transfer',
+        payment_status: paymentReceived ? 'paid' : 'unpaid',
+      });
+
+      if (result.error) throw result.error;
+
+      setBookingSuccess(true);
+      setShowManualBooking(false);
+      setGuestName('');
+      setGuestContact('');
+      setGuestHealthCondition('');
+      setGuestAvatarUrl('');
+      setPaymentReceived(false);
+
+      setTimeout(() => {
+        onClose();
+      }, 2000);
+    } catch (err: any) {
+      console.error('Manual booking error:', err);
+      setBookingError(err.message || 'Failed to create manual booking.');
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
+  const isAdmin = profile?.role === 'admin';
 
   const registrationOpensAt = useMemo(() => {
     if (!training.registration_opens_at) return null;
@@ -432,21 +484,184 @@ export function TrainingDetailModal({ training, onClose }: TrainingDetailModalPr
                       Back
                     </button>
                   </div>
+                ) : showManualBooking ? (
+                  <div className="space-y-4 p-6 bg-[var(--color-cream)] rounded-lg border-2 border-[var(--color-sage)]">
+                    <h3 className="text-lg font-semibold text-[var(--color-earth-dark)] mb-4 flex items-center gap-2">
+                      <UserPlus size={20} />
+                      Manual Guest Registration
+                    </h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-[var(--color-stone)] mb-2">
+                          Guest Name *
+                        </label>
+                        <input
+                          type="text"
+                          value={guestName}
+                          onChange={(e) => setGuestName(e.target.value)}
+                          placeholder="Enter guest full name"
+                          className="w-full px-4 py-2 border border-[var(--color-sand)] rounded-lg focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-[var(--color-stone)] mb-2">
+                          Contact (Phone/Email) *
+                        </label>
+                        <input
+                          type="text"
+                          value={guestContact}
+                          onChange={(e) => setGuestContact(e.target.value)}
+                          placeholder="Phone number or email"
+                          className="w-full px-4 py-2 border border-[var(--color-sand)] rounded-lg focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-[var(--color-stone)] mb-2">
+                          Health Condition / Injuries (Optional)
+                        </label>
+                        <textarea
+                          value={guestHealthCondition}
+                          onChange={(e) => setGuestHealthCondition(e.target.value)}
+                          placeholder="e.g., Back pain, knee injury, pregnancy..."
+                          rows={3}
+                          className="w-full px-4 py-2 border border-[var(--color-sand)] rounded-lg focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent resize-none"
+                        />
+                        <p className="text-xs text-[var(--color-stone)] mt-1">
+                          Helps instructors provide appropriate modifications
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-[var(--color-stone)] mb-2">
+                          Guest Photo (Optional)
+                        </label>
+                        <div className="flex items-center gap-4">
+                          {guestAvatarUrl ? (
+                            <img
+                              src={guestAvatarUrl}
+                              alt="Guest"
+                              className="w-16 h-16 rounded-full object-cover border-2 border-[var(--color-sand)]"
+                            />
+                          ) : (
+                            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[var(--color-sage)] to-[var(--color-clay)] flex items-center justify-center text-white text-xl">
+                              {guestName ? guestName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?'}
+                            </div>
+                          )}
+                          <label
+                            htmlFor="training-guest-avatar"
+                            className="flex items-center gap-2 px-4 py-2 bg-[var(--color-sage)] hover:bg-[var(--color-sage)]/80 text-white rounded-lg cursor-pointer transition-colors text-sm"
+                          >
+                            {uploadingAvatar ? (
+                              <>
+                                <Loader2 size={16} className="animate-spin" />
+                                Uploading...
+                              </>
+                            ) : (
+                              <>
+                                <Camera size={16} />
+                                Upload Photo
+                              </>
+                            )}
+                          </label>
+                          <input
+                            id="training-guest-avatar"
+                            type="file"
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+
+                              if (file.size > 5 * 1024 * 1024) {
+                                setBookingError('Image must be less than 5MB');
+                                return;
+                              }
+
+                              setUploadingAvatar(true);
+                              try {
+                                const { supabase } = await import('../utils/supabase/client');
+                                const fileExt = file.name.split('.').pop();
+                                const fileName = `guest-${Date.now()}.${fileExt}`;
+
+                                const { error: uploadError } = await supabase.storage
+                                  .from('avatars')
+                                  .upload(fileName, file, {
+                                    cacheControl: '3600',
+                                    upsert: true
+                                  });
+
+                                if (uploadError) throw uploadError;
+
+                                const { data: { publicUrl } } = supabase.storage
+                                  .from('avatars')
+                                  .getPublicUrl(fileName);
+
+                                setGuestAvatarUrl(publicUrl);
+                              } catch (error: any) {
+                                console.error('Error uploading photo:', error);
+                                setBookingError(error.message || 'Failed to upload photo');
+                              } finally {
+                                setUploadingAvatar(false);
+                              }
+                            }}
+                            disabled={uploadingAvatar}
+                            className="hidden"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 p-4 bg-white rounded-lg border border-[var(--color-sand)]">
+                        <input
+                          type="checkbox"
+                          id="trainingPaymentReceived"
+                          checked={paymentReceived}
+                          onChange={(e) => setPaymentReceived(e.target.checked)}
+                          className="w-5 h-5 text-[var(--color-sage)] rounded focus:ring-2 focus:ring-[var(--color-sage)]"
+                        />
+                        <label htmlFor="trainingPaymentReceived" className="text-sm text-[var(--color-earth-dark)] cursor-pointer">
+                          Payment Received ({formatMoney(amountDueToday)})
+                        </label>
+                      </div>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => setShowManualBooking(false)}
+                          className="flex-1 px-4 py-3 border-2 border-[var(--color-sand)] rounded-lg hover:border-[var(--color-sage)] transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleManualBooking}
+                          disabled={bookingLoading}
+                          className="flex-1 px-4 py-3 bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          {bookingLoading ? 'Creating...' : 'Create Booking'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 ) : (
-                  <button
-                    onClick={handleBooking}
-                    disabled={bookingLoading || bookingSuccess}
-                    className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white py-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105"
-                  >
-                    <Users size={20} />
-                    <span className="text-lg">
-                      {bookingLoading
-                        ? 'Submitting...'
-                        : bookingSuccess
-                          ? 'Submitted!'
-                          : `Apply / Book Now (${formatMoney(amountDueToday)} due today)`}
-                    </span>
-                  </button>
+                  <div className="space-y-3">
+                    <button
+                      onClick={handleBooking}
+                      disabled={bookingLoading || bookingSuccess}
+                      className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white py-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105"
+                    >
+                      <Users size={20} />
+                      <span className="text-lg">
+                        {bookingLoading
+                          ? 'Submitting...'
+                          : bookingSuccess
+                            ? 'Submitted!'
+                            : `Apply / Book Now (${formatMoney(amountDueToday)} due today)`}
+                      </span>
+                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => setShowManualBooking(true)}
+                        className="w-full py-3 border-2 border-[var(--color-sage)] text-[var(--color-sage)] hover:bg-[var(--color-sage)] hover:text-white rounded-lg transition-all duration-300 flex items-center justify-center gap-2"
+                      >
+                        <UserPlus size={20} />
+                        <span>Manual Guest Booking (Admin)</span>
+                      </button>
+                    )}
+                  </div>
                 )
               ) : (
                 <div className="space-y-3">

@@ -14,7 +14,8 @@ import {
   AlertCircle,
   UserCheck,
   UserPlus,
-  X
+  X,
+  Activity
 } from 'lucide-react';
 
 interface Booking {
@@ -36,6 +37,7 @@ interface Booking {
   amountPaid?: number;
   paidAt?: string | null;
   isAttended?: boolean;
+  healthCondition?: string | null;
 }
 
 interface ClassItem {
@@ -301,9 +303,18 @@ export function TodaysClassesTable({
                                     <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                                       {/* Avatar & Name */}
                                       <div className="flex items-center gap-3 flex-1 min-w-0">
-                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--color-sage)] to-[var(--color-clay)] flex items-center justify-center text-white flex-shrink-0">
-                                          {booking.avatar}
-                                        </div>
+                                        {/* Avatar - Image or Initials */}
+                                        {booking.avatar && booking.avatar.startsWith('http') ? (
+                                          <img
+                                            src={booking.avatar}
+                                            alt={booking.name}
+                                            className="w-10 h-10 rounded-full object-cover border-2 border-[var(--color-sand)] flex-shrink-0"
+                                          />
+                                        ) : (
+                                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--color-sage)] to-[var(--color-clay)] flex items-center justify-center text-white flex-shrink-0 text-sm font-semibold">
+                                            {booking.avatar}
+                                          </div>
+                                        )}
                                         <div className="min-w-0 flex-1">
                                           <div className="flex items-center gap-2 flex-wrap">
                                             <div className="text-sm md:text-base text-[var(--color-earth-dark)] truncate">
@@ -313,6 +324,25 @@ export function TodaysClassesTable({
                                               <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full whitespace-nowrap">
                                                 Guest
                                               </span>
+                                            )}
+                                            {/* Health Condition Alert */}
+                                            {booking.healthCondition && (
+                                              <div className="relative group" title="Health condition noted">
+                                                <Activity 
+                                                  size={16} 
+                                                  className="text-orange-600 cursor-help" 
+                                                />
+                                                {/* Tooltip */}
+                                                <div className="absolute left-0 top-6 z-50 hidden group-hover:block w-64 p-3 bg-white border-2 border-orange-200 rounded-lg shadow-lg">
+                                                  <div className="flex items-start gap-2">
+                                                    <Activity size={14} className="text-orange-600 mt-0.5 flex-shrink-0" />
+                                                    <div>
+                                                      <p className="text-xs font-semibold text-orange-800 mb-1">Health Condition:</p>
+                                                      <p className="text-xs text-[var(--color-earth-dark)]">{booking.healthCondition}</p>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              </div>
                                             )}
                                           </div>
                                           <div className="text-xs text-[var(--color-stone)]">

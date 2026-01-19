@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
-import { X, Search, Loader2, CheckCircle, User as UserIcon, CreditCard, DollarSign } from 'lucide-react';
+import { X, Search, Loader2, CheckCircle, User as UserIcon, CreditCard, DollarSign, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/utils/supabase/client';
 
@@ -74,6 +74,9 @@ export function AdminBookingModal({
 
   const [guestName, setGuestName] = useState('');
   const [guestContact, setGuestContact] = useState('');
+  const [guestHealthCondition, setGuestHealthCondition] = useState('');
+  const [guestAvatarUrl, setGuestAvatarUrl] = useState('');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const [bookingType, setBookingType] = useState<BookingType>('package');
   const [amountDue, setAmountDue] = useState<number>(defaultAmountDue ?? 0);
@@ -122,6 +125,8 @@ export function AdminBookingModal({
     setSelectedUser(null);
     setGuestName('');
     setGuestContact('');
+    setGuestHealthCondition('');
+    setGuestAvatarUrl('');
     setBookingType('package');
     setAmountDue(defaultAmountDue ?? 0);
     setActivePackage(null);
@@ -251,6 +256,8 @@ export function AdminBookingModal({
             user_id: null,
             guest_name: guestName.trim(),
             guest_contact: guestContact.trim() || null,
+            guest_health_condition: guestHealthCondition.trim() || null,
+            guest_avatar_url: guestAvatarUrl || null,
             status: 'booked',
             kind: 'dropin',
             payment_status: 'unpaid',
@@ -268,7 +275,7 @@ export function AdminBookingModal({
           class_id: classId,
           user_id: '', // Guest has no user_id
           name: guestName.trim(),
-          avatar: guestName.trim().split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
+          avatar: guestAvatarUrl || guestName.trim().split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
           phone: guestContact.trim(),
           contactInfo: guestContact.trim(),
           contactPlatform: '',
@@ -522,7 +529,8 @@ export function AdminBookingModal({
 
         {step === 1 && (
           <div className="flex flex-col h-[520px]">
-            <div className="p-6 border-b border-[var(--color-sand)] space-y-4">
+            {/* Scrollable Content Area */}
+            <div className="flex-1 overflow-y-auto max-h-[60vh] p-6 space-y-4">
               {/* Member/Guest Toggle */}
               <div className="flex gap-2 p-1 bg-[var(--color-cream)] rounded-lg">
                 <button
@@ -591,74 +599,169 @@ export function AdminBookingModal({
                       className="w-full px-4 py-3 rounded-lg border border-[var(--color-sand)] focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent"
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm text-[var(--color-earth-dark)] mb-1">
+                      Health Condition / Injuries <span className="text-[var(--color-stone)]">(Optional)</span>
+                    </label>
+                    <textarea
+                      value={guestHealthCondition}
+                      onChange={(e) => setGuestHealthCondition(e.target.value)}
+                      placeholder="e.g., Back pain, knee injury, pregnancy..."
+                      rows={3}
+                      className="w-full px-4 py-3 rounded-lg border border-[var(--color-sand)] focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent resize-none"
+                    />
+                    <p className="text-xs text-[var(--color-stone)] mt-1">
+                      Helps instructors provide appropriate modifications
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-[var(--color-earth-dark)] mb-2">
+                      Guest Photo <span className="text-[var(--color-stone)]">(Optional)</span>
+                    </label>
+                    <div className="flex items-center gap-4">
+                      {guestAvatarUrl ? (
+                        <img
+                          src={guestAvatarUrl}
+                          alt="Guest"
+                          className="w-16 h-16 rounded-full object-cover border-2 border-[var(--color-sand)]"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[var(--color-sage)] to-[var(--color-clay)] flex items-center justify-center text-white text-xl">
+                          {guestName ? guestName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?'}
+                        </div>
+                      )}
+                      <label
+                        htmlFor="guest-avatar-upload"
+                        className="flex items-center gap-2 px-4 py-2 bg-[var(--color-sage)] hover:bg-[var(--color-sage)]/80 text-white rounded-lg cursor-pointer transition-colors"
+                      >
+                        {uploadingAvatar ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Camera size={16} />
+                            Upload Photo
+                          </>
+                        )}
+                      </label>
+                      <input
+                        id="guest-avatar-upload"
+                        type="file"
+                        accept="image/*"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+
+                          if (file.size > 5 * 1024 * 1024) {
+                            toast.error('Image must be less than 5MB');
+                            return;
+                          }
+
+                          setUploadingAvatar(true);
+                          try {
+                            const fileExt = file.name.split('.').pop();
+                            const fileName = `guest-${Date.now()}.${fileExt}`;
+
+                            const { error: uploadError } = await supabase.storage
+                              .from('avatars')
+                              .upload(fileName, file, {
+                                cacheControl: '3600',
+                                upsert: true
+                              });
+
+                            if (uploadError) throw uploadError;
+
+                            const { data: { publicUrl } } = supabase.storage
+                              .from('avatars')
+                              .getPublicUrl(fileName);
+
+                            setGuestAvatarUrl(publicUrl);
+                            toast.success('Photo uploaded!');
+                          } catch (error: any) {
+                            console.error('Error uploading photo:', error);
+                            toast.error(error.message || 'Failed to upload photo');
+                          } finally {
+                            setUploadingAvatar(false);
+                          }
+                        }}
+                        disabled={uploadingAvatar}
+                        className="hidden"
+                      />
+                    </div>
+                  </div>
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
                     <strong>Note:</strong> Guest bookings are automatically set as drop-in (no package).
                   </div>
                 </div>
               )}
+              
               {searchError != null && (
-                <div className="mt-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+                <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
                   {searchError instanceof Error
                     ? searchError.message
                     : (JSON.stringify(searchError) ?? String(searchError))}
                 </div>
               )}
-            </div>
 
-            <div className="flex-1 overflow-y-auto p-6">
-              {searching ? (
-                <div className="flex items-center justify-center py-16 text-[var(--color-stone)]">
-                  <Loader2 size={20} className="animate-spin mr-2" />
-                  Searching...
-                </div>
-              ) : results.length === 0 ? (
-                <div className="text-center py-16 text-[var(--color-stone)]">
-                  Type at least 2 characters to search.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {results.map((p) => {
-                    const initials = (p.full_name ?? 'U')
-                      .split(' ')
-                      .filter(Boolean)
-                      .slice(0, 2)
-                      .map((n) => n[0])
-                      .join('')
-                      .toUpperCase();
+              {/* Member Search Results */}
+              {userType === 'member' && (
+                searching ? (
+                  <div className="flex items-center justify-center py-16 text-[var(--color-stone)]">
+                    <Loader2 size={20} className="animate-spin mr-2" />
+                    Searching...
+                  </div>
+                ) : results.length === 0 ? (
+                  <div className="text-center py-16 text-[var(--color-stone)]">
+                    Type at least 2 characters to search.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {results.map((p) => {
+                      const initials = (p.full_name ?? 'U')
+                        .split(' ')
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map((n) => n[0])
+                        .join('')
+                        .toUpperCase();
 
-                    const isSelected = selectedUser?.id === p.id;
-                    return (
-                      <button
-                        key={p.id}
-                        onClick={() => setSelectedUser(p)}
-                        className={`w-full p-4 rounded-lg border-2 transition-all duration-200 text-left ${
-                          isSelected
-                            ? 'border-[var(--color-sage)] bg-[var(--color-sage)]/10'
-                            : 'border-[var(--color-sand)] hover:border-[var(--color-sage)]/50 hover:bg-[var(--color-cream)]/50'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[var(--color-sage)] to-[var(--color-clay)] flex items-center justify-center text-white flex-shrink-0">
-                            {initials}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-base text-[var(--color-earth-dark)] truncate">
-                              {p.full_name ?? 'Unnamed'}
+                      const isSelected = selectedUser?.id === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => setSelectedUser(p)}
+                          className={`w-full p-4 rounded-lg border-2 transition-all duration-200 text-left ${
+                            isSelected
+                              ? 'border-[var(--color-sage)] bg-[var(--color-sage)]/10'
+                              : 'border-[var(--color-sand)] hover:border-[var(--color-sage)]/50 hover:bg-[var(--color-cream)]/50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[var(--color-sage)] to-[var(--color-clay)] flex items-center justify-center text-white flex-shrink-0">
+                              {initials}
                             </div>
-                            <div className="text-sm text-[var(--color-stone)] truncate">
-                              {p.contact_info ?? ''}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-base text-[var(--color-earth-dark)] truncate">
+                                {p.full_name ?? 'Unnamed'}
+                              </div>
+                              <div className="text-sm text-[var(--color-stone)] truncate">
+                                {p.contact_info ?? ''}
+                              </div>
+                              <div className="text-xs text-[var(--color-stone)] truncate">{p.phone ?? ''}</div>
                             </div>
-                            <div className="text-xs text-[var(--color-stone)] truncate">{p.phone ?? ''}</div>
+                            {isSelected && <CheckCircle size={18} className="text-[var(--color-sage)]" />}
                           </div>
-                          {isSelected && <CheckCircle size={18} className="text-[var(--color-sage)]" />}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )
               )}
             </div>
 
+            {/* Fixed Footer */}
             <div className="p-6 border-t border-[var(--color-sand)] flex items-center justify-between gap-3">
               <button
                 onClick={onClose}

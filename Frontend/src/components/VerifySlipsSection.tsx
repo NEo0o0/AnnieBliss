@@ -15,13 +15,15 @@ interface Booking {
   payment_note: string | null;
   amount_due: number;
   created_at: string;
+  guest_name: string | null;
+  guest_contact: string | null;
   classes: {
     id: number;
     title: string | null;
     starts_at: string;
     price: number | null;
   } | null;
-  profiles: {
+  profiles?: {
     id: string;
     full_name: string | null;
     phone: string | null;
@@ -30,6 +32,7 @@ interface Booking {
 
 export function VerifySlipsSection() {
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [unpaidGuestBookings, setUnpaidGuestBookings] = useState<Booking[]>([]);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [processing, setProcessing] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,6 +70,27 @@ export function VerifySlipsSection() {
         if (error) throw error;
 
         setBookings(pendingBookings || []);
+
+        // Fetch unpaid guest bookings (no slip uploaded)
+        const { data: unpaidGuests, error: unpaidError } = await supabase
+          .from('bookings')
+          .select(`
+            *,
+            classes (
+              id,
+              title,
+              starts_at,
+              price
+            )
+          `)
+          .eq('payment_status', 'unpaid')
+          .not('guest_name', 'is', null)
+          .neq('status', 'cancelled')
+          .order('created_at', { ascending: false });
+
+        if (unpaidError) throw unpaidError;
+
+        setUnpaidGuestBookings(unpaidGuests || []);
       } catch (error: any) {
         console.error('Error fetching pending bookings:', error);
         toast.error(error.message || 'Failed to load pending bookings');
@@ -150,6 +174,36 @@ export function VerifySlipsSection() {
     }
   };
 
+  const handleMarkGuestAsPaid = async (bookingId: number) => {
+    setProcessing(bookingId);
+    try {
+      const booking = unpaidGuestBookings.find(b => b.id === bookingId);
+      if (!booking) throw new Error('Booking not found');
+
+      const { error } = await supabase
+        .from('bookings')
+        .update({
+          payment_status: 'paid',
+          payment_method: 'cash',
+          amount_paid: booking.amount_due,
+          paid_at: new Date().toISOString()
+        })
+        .eq('id', bookingId);
+
+      if (error) throw error;
+
+      toast.success(`Guest payment marked as paid (฿${booking.amount_due})`);
+      
+      // Remove from unpaid list
+      setUnpaidGuestBookings(unpaidGuestBookings.filter(b => b.id !== bookingId));
+    } catch (error: any) {
+      console.error('Error marking guest as paid:', error);
+      toast.error(error.message || 'Failed to mark as paid');
+    } finally {
+      setProcessing(null);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -168,7 +222,10 @@ export function VerifySlipsSection() {
     );
   }
 
-  if (bookings.length === 0) {
+  const hasSlipVerifications = bookings.length > 0;
+  const hasUnpaidGuests = unpaidGuestBookings.length > 0;
+
+  if (!hasSlipVerifications && !hasUnpaidGuests) {
     return (
       <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
         <CheckCircle size={64} className="mx-auto text-green-500 mb-4" />
@@ -176,7 +233,7 @@ export function VerifySlipsSection() {
           All Clear!
         </h2>
         <p className="text-[var(--color-stone)]">
-          No payment slips pending verification at the moment.
+          No payment slips or unpaid guest bookings at the moment.
         </p>
       </div>
     );
@@ -382,6 +439,78 @@ export function VerifySlipsSection() {
           </div>
         )}
       </div>
+
+      {/* Unpaid Guest Bookings Section */}
+      {hasUnpaidGuests && (
+        <div className="col-span-full mt-8">
+          <div className="bg-orange-50 border-l-4 border-orange-500 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold text-orange-800 mb-2 flex items-center gap-2">
+              <DollarSign size={24} />
+              Pending Guest Payments (No Slip)
+            </h2>
+            <p className="text-sm text-orange-700">
+              These are manual guest bookings where payment was not received at the time of booking.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {unpaidGuestBookings.map((booking) => (
+              <div
+                key={booking.id}
+                className="bg-white rounded-xl shadow-md p-5 border-2 border-orange-200 hover:shadow-lg transition-shadow"
+              >
+                <div className="mb-4">
+                  <h3 className="font-semibold text-[var(--color-earth-dark)] mb-1">
+                    {booking.guest_name || 'Unknown Guest'}
+                  </h3>
+                  <p className="text-sm text-[var(--color-stone)]">
+                    {booking.classes?.title || 'Unknown Class'}
+                  </p>
+                </div>
+
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center gap-2 text-sm">
+                    <User size={14} className="text-[var(--color-stone)]" />
+                    <span className="text-[var(--color-stone)]">
+                      {booking.guest_contact || 'No contact info'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Calendar size={14} className="text-[var(--color-stone)]" />
+                    <span className="text-[var(--color-stone)]">
+                      {formatDate(booking.created_at)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <DollarSign size={16} className="text-orange-600" />
+                    <span className="text-lg font-semibold text-orange-600">
+                      ฿{booking.amount_due}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => handleMarkGuestAsPaid(booking.id)}
+                  disabled={processing === booking.id}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed text-sm font-medium"
+                >
+                  {processing === booking.id ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle size={16} />
+                      Mark as Paid (Cash)
+                    </>
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

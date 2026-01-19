@@ -1,6 +1,6 @@
  "use client";
 
-import { X, Clock, Calendar, MapPin, DollarSign, Users, Tag, UserPlus } from 'lucide-react';
+import { X, Clock, Calendar, MapPin, DollarSign, Users, Tag, UserPlus, Camera, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useBookings } from '../hooks/useBookings';
@@ -35,6 +35,9 @@ export function EventDetailModal({ event, onClose, onNavigate }: EventDetailModa
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [guestName, setGuestName] = useState('');
   const [guestContact, setGuestContact] = useState('');
+  const [guestHealthCondition, setGuestHealthCondition] = useState('');
+  const [guestAvatarUrl, setGuestAvatarUrl] = useState('');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [paymentReceived, setPaymentReceived] = useState(false);
 
   const isAdmin = profile?.role === 'admin';
@@ -102,6 +105,8 @@ export function EventDetailModal({ event, onClose, onNavigate }: EventDetailModa
         kind: 'dropin',
         guest_name: guestName,
         guest_contact: guestContact,
+        guest_health_condition: guestHealthCondition.trim() || null,
+        guest_avatar_url: guestAvatarUrl || null,
         amount_due: workshopPrice,
         payment_method: 'bank_transfer',
         payment_status: paymentReceived ? 'paid' : 'unpaid',
@@ -117,6 +122,8 @@ export function EventDetailModal({ event, onClose, onNavigate }: EventDetailModa
       setShowManualBooking(false);
       setGuestName('');
       setGuestContact('');
+      setGuestHealthCondition('');
+      setGuestAvatarUrl('');
       setPaymentReceived(false);
 
       setTimeout(() => {
@@ -326,6 +333,98 @@ export function EventDetailModal({ event, onClose, onNavigate }: EventDetailModa
                     placeholder="Phone number or email"
                     className="w-full px-4 py-2 border border-[var(--color-sand)] rounded-lg focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-stone)] mb-2">
+                    Health Condition / Injuries (Optional)
+                  </label>
+                  <textarea
+                    value={guestHealthCondition}
+                    onChange={(e) => setGuestHealthCondition(e.target.value)}
+                    placeholder="e.g., Back pain, knee injury, pregnancy..."
+                    rows={3}
+                    className="w-full px-4 py-2 border border-[var(--color-sand)] rounded-lg focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent resize-none"
+                  />
+                  <p className="text-xs text-[var(--color-stone)] mt-1">
+                    Helps instructors provide appropriate modifications
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-stone)] mb-2">
+                    Guest Photo (Optional)
+                  </label>
+                  <div className="flex items-center gap-4">
+                    {guestAvatarUrl ? (
+                      <img
+                        src={guestAvatarUrl}
+                        alt="Guest"
+                        className="w-16 h-16 rounded-full object-cover border-2 border-[var(--color-sand)]"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[var(--color-sage)] to-[var(--color-clay)] flex items-center justify-center text-white text-xl">
+                        {guestName ? guestName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?'}
+                      </div>
+                    )}
+                    <label
+                      htmlFor="workshop-guest-avatar"
+                      className="flex items-center gap-2 px-4 py-2 bg-[var(--color-sage)] hover:bg-[var(--color-sage)]/80 text-white rounded-lg cursor-pointer transition-colors text-sm"
+                    >
+                      {uploadingAvatar ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Camera size={16} />
+                          Upload Photo
+                        </>
+                      )}
+                    </label>
+                    <input
+                      id="workshop-guest-avatar"
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+
+                        if (file.size > 5 * 1024 * 1024) {
+                          setBookingError('Image must be less than 5MB');
+                          return;
+                        }
+
+                        setUploadingAvatar(true);
+                        try {
+                          const { supabase } = await import('../utils/supabase/client');
+                          const fileExt = file.name.split('.').pop();
+                          const fileName = `guest-${Date.now()}.${fileExt}`;
+
+                          const { error: uploadError } = await supabase.storage
+                            .from('avatars')
+                            .upload(fileName, file, {
+                              cacheControl: '3600',
+                              upsert: true
+                            });
+
+                          if (uploadError) throw uploadError;
+
+                          const { data: { publicUrl } } = supabase.storage
+                            .from('avatars')
+                            .getPublicUrl(fileName);
+
+                          setGuestAvatarUrl(publicUrl);
+                        } catch (error: any) {
+                          console.error('Error uploading photo:', error);
+                          setBookingError(error.message || 'Failed to upload photo');
+                        } finally {
+                          setUploadingAvatar(false);
+                        }
+                      }}
+                      disabled={uploadingAvatar}
+                      className="hidden"
+                    />
+                  </div>
                 </div>
                 <div className="flex items-center gap-3 p-4 bg-white rounded-lg border border-[var(--color-sand)]">
                   <input

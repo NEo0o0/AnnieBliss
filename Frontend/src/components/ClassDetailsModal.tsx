@@ -1,4 +1,4 @@
-import { X, Clock, User, MapPin, Calendar, DollarSign, CheckCircle2 } from 'lucide-react';
+import { X, Clock, User, MapPin, Calendar, DollarSign, CheckCircle2, UserPlus, Camera, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useBookings } from '../hooks/useBookings';
@@ -34,7 +34,7 @@ interface ClassDetailsModalProps {
 }
 
 export function ClassDetailsModal({ classData, onClose, onNavigate, onBookingSuccess }: ClassDetailsModalProps) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { createBooking, checkUserPackage, checkExistingBooking } = useBookings({ autoFetch: false });
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
@@ -47,6 +47,13 @@ export function ClassDetailsModal({ classData, onClose, onNavigate, onBookingSuc
   const [loadingPackageData, setLoadingPackageData] = useState(true);
   const [dataLoadError, setDataLoadError] = useState<string | null>(null);
   const [localEnrolled, setLocalEnrolled] = useState(classData.enrolled);
+  const [showManualBooking, setShowManualBooking] = useState(false);
+  const [guestName, setGuestName] = useState('');
+  const [guestContact, setGuestContact] = useState('');
+  const [guestHealthCondition, setGuestHealthCondition] = useState('');
+  const [guestAvatarUrl, setGuestAvatarUrl] = useState('');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [paymentReceived, setPaymentReceived] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -185,9 +192,63 @@ export function ClassDetailsModal({ classData, onClose, onNavigate, onBookingSuc
     onNavigate('login');
   };
 
+  const handleManualBooking = async () => {
+    if (!guestName || !guestContact) {
+      setBookingError('Please enter guest name and contact information.');
+      return;
+    }
+
+    try {
+      setBookingLoading(true);
+      setBookingError(null);
+
+      const result = await createBooking({
+        class_id: parseInt(classData.id),
+        kind: 'dropin',
+        guest_name: guestName,
+        guest_contact: guestContact,
+        guest_health_condition: guestHealthCondition.trim() || null,
+        guest_avatar_url: guestAvatarUrl || null,
+        amount_due: classData.price,
+        payment_method: 'bank_transfer',
+        payment_status: paymentReceived ? 'paid' : 'unpaid',
+      });
+
+      if (result.error) throw result.error;
+
+      setBookingSuccess(true);
+      setShowManualBooking(false);
+      setGuestName('');
+      setGuestContact('');
+      setGuestHealthCondition('');
+      setGuestAvatarUrl('');
+      setPaymentReceived(false);
+      setLocalEnrolled(prev => prev + 1);
+
+      if (onBookingSuccess) {
+        onBookingSuccess();
+      }
+
+      setTimeout(() => {
+        onClose();
+      }, 2000);
+    } catch (err: any) {
+      console.error('Manual booking error:', err);
+      setBookingError(err.message || 'Failed to create manual booking.');
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
+  const isAdmin = profile?.role === 'admin';
+
   const spotsLeft = classData.capacity - localEnrolled;
   const isFull = spotsLeft <= 0;
   const displayPrice = classData.price > 0 ? `฿${classData.price.toLocaleString()}` : 'Free';
+  const formatMoney = (amount: number) => {
+    if (!amount || amount === 0) return 'Free';
+    return `฿${amount.toLocaleString()}`;
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -411,41 +472,210 @@ export function ClassDetailsModal({ classData, onClose, onNavigate, onBookingSuc
               </div>
             )}
 
+            {/* Manual Guest Booking Form (Admin Only) */}
+            {showManualBooking && !bookingSuccess && (
+              <div className="mb-6 p-6 bg-[var(--color-cream)] rounded-lg border-2 border-[var(--color-sage)]">
+                <h3 className="text-lg font-semibold text-[var(--color-earth-dark)] mb-4 flex items-center gap-2">
+                  <UserPlus size={20} />
+                  Manual Guest Registration
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--color-stone)] mb-2">
+                      Guest Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={guestName}
+                      onChange={(e) => setGuestName(e.target.value)}
+                      placeholder="Enter guest full name"
+                      className="w-full px-4 py-2 border border-[var(--color-sand)] rounded-lg focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--color-stone)] mb-2">
+                      Contact (Phone/Email) *
+                    </label>
+                    <input
+                      type="text"
+                      value={guestContact}
+                      onChange={(e) => setGuestContact(e.target.value)}
+                      placeholder="Phone number or email"
+                      className="w-full px-4 py-2 border border-[var(--color-sand)] rounded-lg focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--color-stone)] mb-2">
+                      Health Condition / Injuries (Optional)
+                    </label>
+                    <textarea
+                      value={guestHealthCondition}
+                      onChange={(e) => setGuestHealthCondition(e.target.value)}
+                      placeholder="e.g., Back pain, knee injury, pregnancy..."
+                      rows={3}
+                      className="w-full px-4 py-2 border border-[var(--color-sand)] rounded-lg focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent resize-none"
+                    />
+                    <p className="text-xs text-[var(--color-stone)] mt-1">
+                      Helps instructors provide appropriate modifications
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--color-stone)] mb-2">
+                      Guest Photo (Optional)
+                    </label>
+                    <div className="flex items-center gap-4">
+                      {guestAvatarUrl ? (
+                        <img
+                          src={guestAvatarUrl}
+                          alt="Guest"
+                          className="w-16 h-16 rounded-full object-cover border-2 border-[var(--color-sand)]"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[var(--color-sage)] to-[var(--color-clay)] flex items-center justify-center text-white text-xl">
+                          {guestName ? guestName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?'}
+                        </div>
+                      )}
+                      <label
+                        htmlFor="class-guest-avatar"
+                        className="flex items-center gap-2 px-4 py-2 bg-[var(--color-sage)] hover:bg-[var(--color-sage)]/80 text-white rounded-lg cursor-pointer transition-colors text-sm"
+                      >
+                        {uploadingAvatar ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Camera size={16} />
+                            Upload Photo
+                          </>
+                        )}
+                      </label>
+                      <input
+                        id="class-guest-avatar"
+                        type="file"
+                        accept="image/*"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+
+                          if (file.size > 5 * 1024 * 1024) {
+                            setBookingError('Image must be less than 5MB');
+                            return;
+                          }
+
+                          setUploadingAvatar(true);
+                          try {
+                            const { supabase } = await import('../utils/supabase/client');
+                            const fileExt = file.name.split('.').pop();
+                            const fileName = `guest-${Date.now()}.${fileExt}`;
+
+                            const { error: uploadError } = await supabase.storage
+                              .from('avatars')
+                              .upload(fileName, file, {
+                                cacheControl: '3600',
+                                upsert: true
+                              });
+
+                            if (uploadError) throw uploadError;
+
+                            const { data: { publicUrl } } = supabase.storage
+                              .from('avatars')
+                              .getPublicUrl(fileName);
+
+                            setGuestAvatarUrl(publicUrl);
+                          } catch (error: any) {
+                            console.error('Error uploading photo:', error);
+                            setBookingError(error.message || 'Failed to upload photo');
+                          } finally {
+                            setUploadingAvatar(false);
+                          }
+                        }}
+                        disabled={uploadingAvatar}
+                        className="hidden"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-4 bg-white rounded-lg border border-[var(--color-sand)]">
+                    <input
+                      type="checkbox"
+                      id="classPaymentReceived"
+                      checked={paymentReceived}
+                      onChange={(e) => setPaymentReceived(e.target.checked)}
+                      className="w-5 h-5 text-[var(--color-sage)] rounded focus:ring-2 focus:ring-[var(--color-sage)]"
+                    />
+                    <label htmlFor="classPaymentReceived" className="text-sm text-[var(--color-earth-dark)] cursor-pointer">
+                      Payment Received ({formatMoney(classData.price)})
+                    </label>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowManualBooking(false)}
+                      className="flex-1 px-4 py-3 border-2 border-[var(--color-sand)] rounded-lg hover:border-[var(--color-sage)] transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleManualBooking}
+                      disabled={bookingLoading}
+                      className="flex-1 px-4 py-3 bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {bookingLoading ? 'Creating...' : 'Create Booking'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Action Buttons */}
-            <div className="flex gap-4">
+            <div className="flex flex-col gap-3">
               {user ? (
-                !showPaymentSelector ? (
-                  <button
-                    onClick={handleBookingClick}
-                    disabled={bookingLoading || bookingSuccess || isFull || existingBooking || loadingPackageData}
-                    className={`flex-1 py-4 rounded-lg font-medium transition-all duration-300 shadow-md hover:shadow-lg ${
-                      bookingSuccess
-                        ? 'bg-green-500 text-white cursor-default'
+                !showPaymentSelector && !showManualBooking ? (
+                  <>
+                    <button
+                      onClick={handleBookingClick}
+                      disabled={bookingLoading || bookingSuccess || isFull || existingBooking || loadingPackageData}
+                      className={`w-full py-4 rounded-lg font-medium transition-all duration-300 shadow-md hover:shadow-lg ${
+                        bookingSuccess
+                          ? 'bg-green-500 text-white cursor-default'
+                          : existingBooking
+                          ? 'bg-blue-300 text-blue-800 cursor-not-allowed'
+                          : isFull
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : loadingPackageData
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white'
+                      }`}
+                    >
+                      {loadingPackageData
+                        ? 'Loading...'
+                        : bookingLoading
+                        ? 'Booking...'
+                        : bookingSuccess
+                        ? 'Booked ✓'
                         : existingBooking
-                        ? 'bg-blue-300 text-blue-800 cursor-not-allowed'
+                        ? 'Already Booked'
                         : isFull
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : loadingPackageData
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white'
-                    }`}
-                  >
-                    {loadingPackageData
-                      ? 'Loading...'
-                      : bookingLoading
-                      ? 'Booking...'
-                      : bookingSuccess
-                      ? 'Booked ✓'
-                      : existingBooking
-                      ? 'Already Booked'
-                      : isFull
-                      ? 'Fully Booked'
-                      : 'Book This Class'}
-                  </button>
+                        ? 'Fully Booked'
+                        : 'Book This Class'}
+                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => setShowManualBooking(true)}
+                        className="w-full py-3 border-2 border-[var(--color-sage)] text-[var(--color-sage)] hover:bg-[var(--color-sage)] hover:text-white rounded-lg transition-all duration-300 flex items-center justify-center gap-2"
+                      >
+                        <UserPlus size={20} />
+                        <span>Manual Guest Booking (Admin)</span>
+                      </button>
+                    )}
+                  </>
                 ) : (
                   <button
-                    onClick={() => setShowPaymentSelector(false)}
-                    className="flex-1 py-4 border-2 border-[var(--color-sand)] hover:border-[var(--color-sage)] text-[var(--color-earth-dark)] rounded-lg font-medium transition-all duration-300"
+                    onClick={() => {
+                      setShowPaymentSelector(false);
+                      setShowManualBooking(false);
+                    }}
+                    className="w-full py-4 border-2 border-[var(--color-sand)] hover:border-[var(--color-sage)] text-[var(--color-earth-dark)] rounded-lg font-medium transition-all duration-300"
                   >
                     Back
                   </button>
@@ -453,14 +683,14 @@ export function ClassDetailsModal({ classData, onClose, onNavigate, onBookingSuc
               ) : (
                 <button
                   onClick={handleLoginRedirect}
-                  className="flex-1 py-4 bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white rounded-lg font-medium transition-all duration-300 shadow-md hover:shadow-lg"
+                  className="w-full py-4 bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white rounded-lg font-medium transition-all duration-300 shadow-md hover:shadow-lg"
                 >
                   Login to Book
                 </button>
               )}
               <button
                 onClick={onClose}
-                className="px-8 py-4 border-2 border-[var(--color-sand)] hover:border-[var(--color-sage)] text-[var(--color-earth-dark)] rounded-lg font-medium transition-all duration-300"
+                className="w-full py-4 border-2 border-[var(--color-sand)] hover:border-[var(--color-sage)] text-[var(--color-earth-dark)] rounded-lg font-medium transition-all duration-300"
               >
                 Close
               </button>

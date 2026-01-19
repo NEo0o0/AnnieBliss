@@ -360,12 +360,6 @@ export function WeeklySchedule({ onNavigate, initialClasses }: WeeklySchedulePro
                   {viewMode === 'month' && selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                 </p>
               </div>
-              <button
-                onClick={handleToday}
-                className="mt-2 text-sm text-[var(--color-sage)] hover:text-[var(--color-clay)] transition-colors duration-300"
-              >
-                Go to Today
-              </button>
             </div>
 
             <button

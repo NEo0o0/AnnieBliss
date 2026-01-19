@@ -82,7 +82,7 @@ export function MembersManagement() {
       console.log('Fetching profiles...');
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, full_name, phone, role, created_at, avatar_url')
+        .select('id, full_name, phone, role, created_at, avatar_url, health_condition')
         .order('full_name');
 
       if (profilesError) {

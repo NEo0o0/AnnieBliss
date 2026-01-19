@@ -6,11 +6,13 @@ export const revalidate = 30;
 
 async function fetchTeacherTrainingFromDb() {
   const supabase = createSupabasePublicClient();
+  const now = new Date().toISOString();
 
   const { data, error } = await supabase
     .from('classes')
     .select('*')
     .eq('category', 'Teacher Training')
+    .gte('starts_at', now)
     .order('starts_at', { ascending: true });
 
   if (error) throw error;

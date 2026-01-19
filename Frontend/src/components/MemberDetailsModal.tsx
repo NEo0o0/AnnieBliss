@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { X, Calendar, Package, GraduationCap, Loader2 } from 'lucide-react';
+import { X, Calendar, Package, GraduationCap, Loader2, Activity } from 'lucide-react';
 import { supabase } from '@/utils/supabase/client';
 import { Avatar } from './Avatar';
 import { toast } from 'sonner';
@@ -46,14 +46,14 @@ export function MemberDetailsModal({ memberId, memberName, isInstructor, onClose
   const [packageHistory, setPackageHistory] = useState<PackageHistoryItem[]>([]);
   const [teachingHistory, setTeachingHistory] = useState<TeachingHistoryItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [memberProfile, setMemberProfile] = useState<{ avatar_url: string | null; phone: string | null } | null>(null);
+  const [memberProfile, setMemberProfile] = useState<{ avatar_url: string | null; phone: string | null; health_condition: string | null } | null>(null);
 
   useEffect(() => {
     // Fetch member profile data
     const fetchMemberProfile = async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('avatar_url, phone')
+        .select('avatar_url, phone, health_condition')
         .eq('id', memberId)
         .single();
       
@@ -241,6 +241,23 @@ export function MemberDetailsModal({ memberId, memberName, isInstructor, onClose
             <X size={24} className="text-[var(--color-stone)]" />
           </button>
         </div>
+
+        {/* Health Condition Alert */}
+        {memberProfile?.health_condition && (
+          <div className="mx-6 mt-4 bg-orange-50 border-l-4 border-orange-500 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <Activity className="text-orange-600 mt-0.5 flex-shrink-0" size={20} />
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-orange-800 mb-1">
+                  Health Condition / Medical Note
+                </h3>
+                <p className="text-sm text-[var(--color-earth-dark)]">
+                  {memberProfile.health_condition}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="border-b border-[var(--color-sand)]">

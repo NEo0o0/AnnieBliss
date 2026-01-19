@@ -6,6 +6,7 @@ import { ProfileTabs } from './ProfileTabs';
 import { LogoutButton } from './LogoutButton';
 import { ProfileClient } from './ProfileClient';
 import { BundlesClient } from './BundlesClient';
+import { ProfileEditClient } from './ProfileEditClient';
 
 type ProfileRow = Tables<'profiles'>;
 type BookingRow = Tables<'bookings'>;
@@ -85,9 +86,17 @@ export default async function ProfilePage() {
         <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
           <div className="flex items-start sm:items-center justify-between gap-6 flex-col sm:flex-row">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[var(--color-sage)] to-[var(--color-clay)] flex items-center justify-center text-white text-2xl">
-                {displayName.charAt(0).toUpperCase()}
-              </div>
+              {profile?.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  alt={displayName}
+                  className="w-16 h-16 rounded-full object-cover border-2 border-[var(--color-sand)]"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[var(--color-sage)] to-[var(--color-clay)] flex items-center justify-center text-white text-2xl">
+                  {displayName.charAt(0).toUpperCase()}
+                </div>
+              )}
               <div>
                 <div className="flex items-center gap-3 flex-wrap">
                   <h1 className="text-2xl text-[var(--color-earth-dark)]">{displayName}</h1>
@@ -162,6 +171,18 @@ export default async function ProfilePage() {
                   bundles={bundles ?? []}
                   activePackages={activePackages}
                   userId={user.id}
+                />
+              }
+              profile={
+                <ProfileEditClient
+                  userId={user.id}
+                  initialProfile={{
+                    full_name: profile?.full_name || null,
+                    avatar_url: profile?.avatar_url || null,
+                    health_condition: (profile as any)?.health_condition || null,
+                    phone: profile?.phone || null,
+                  }}
+                  isAdmin={role === 'admin'}
                 />
               }
             />
