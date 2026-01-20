@@ -104,7 +104,7 @@ export function MemberDetailsModal({ memberId, memberName, isInstructor, onClose
           .in('id', recordedByIds);
 
         recordedByNames = (profiles || []).reduce((acc, p) => {
-          acc[p.id] = p.full_name;
+          acc[p.id] = p.full_name || 'Unknown';
           return acc;
         }, {} as Record<string, string>);
       }

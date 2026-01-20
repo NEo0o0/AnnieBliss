@@ -41,16 +41,32 @@ export function useClasses(options: UseClassesOptions = {}) {
       if (category) params.set('category', category);
       if (classTypeId != null) params.set('classTypeId', String(classTypeId));
 
-      const response = await fetch(`/api/classes?${params.toString()}`);
+      const url = `/api/classes?${params.toString()}`;
+      console.log('[useClasses] Fetching classes from:', url);
+
+      const response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`Failed to fetch classes (${response.status})`);
+        const errorText = await response.text();
+        console.error('[useClasses] Fetch failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          url,
+          errorText,
+        });
+        throw new Error(`Failed to fetch classes (${response.status}): ${errorText}`);
       }
 
       const json = (await response.json()) as { data: Class[] };
+      console.log('[useClasses] Successfully fetched', json.data?.length ?? 0, 'classes');
       setClasses(json.data ?? []);
-    } catch (err) {
+    } catch (err: any) {
+      console.error('[useClasses] Error fetching classes:', {
+        message: err.message,
+        stack: err.stack,
+        name: err.name,
+        params: { startDate, endDate, category, classTypeId },
+      });
       setError(err as Error);
-      console.error('Error fetching classes:', err);
     } finally {
       setLoading(false);
     }

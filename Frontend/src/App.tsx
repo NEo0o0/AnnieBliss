@@ -258,16 +258,16 @@ export default function App() {
           
           {currentPage === 'teacher-training' && (
             <>
-              <TeacherTrainingHero onNavigate={handleNavigate} />
+              <TeacherTrainingHero />
               <Curriculum />
-              <SchedulePricing onNavigate={handleNavigate} />
+              <SchedulePricing />
               <ApplyCTA />
             </>
           )}
           
           {currentPage === 'workshops' && (
             <>
-              <WorkshopsEvents onNavigate={handleNavigate} />
+              <WorkshopsEvents />
             </>
           )}
           
@@ -275,7 +275,6 @@ export default function App() {
             <>
               <Pricing 
                 isAuthenticated={isAuthenticated}
-                onNavigate={handleNavigate}
               />
             </>
           )}

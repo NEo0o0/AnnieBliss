@@ -47,7 +47,7 @@ export function ClassDetailModal({ classData, onClose, onNavigate, onBookingSucc
       const result = await createBooking({
         user_id: user.id,
         class_id: parseInt(classData.id),
-        kind: 'drop_in',
+        kind: 'dropin',
         status: 'booked',
         amount_due: classData.price,
       });

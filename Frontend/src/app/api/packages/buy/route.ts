@@ -48,8 +48,16 @@ export async function POST(request: Request) {
   const expire = new Date(now);
   expire.setDate(expire.getDate() + (pkg.duration_days ?? 0));
 
-  // Create user package with pending_activation status
-  // Admin will activate after verifying payment
+  // Determine payment status based on method and slip
+  let paymentStatus = 'pending_verification';
+  
+  if (paymentMethod === 'cash') {
+    paymentStatus = 'unpaid';
+  } else if (paymentSlipUrl) {
+    paymentStatus = 'partial'; // Has slip, awaiting verification
+  }
+
+  // Create user package with payment fields
   const { data: userPackage, error: createError } = await supabase
     .from('user_packages')
     .insert({
@@ -60,6 +68,12 @@ export async function POST(request: Request) {
       activated_at: null, // Not activated yet
       expire_at: expire.toISOString(),
       status: 'pending_activation', // Pending until admin verifies payment
+      payment_method: paymentMethod || 'bank_transfer',
+      payment_status: paymentStatus,
+      payment_slip_url: paymentSlipUrl || null,
+      payment_note: paymentNote || null,
+      amount_due: pkg.price || 0,
+      amount_paid: 0, // Will be set by admin during verification
     })
     .select()
     .single();
@@ -68,7 +82,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: createError.message }, { status: 400 });
   }
 
-  // Create payment record
+  // Also create payment record for history tracking
   const { error: paymentError } = await supabase.from('payments').insert({
     user_id: user.id,
     user_package_id: userPackage.id,

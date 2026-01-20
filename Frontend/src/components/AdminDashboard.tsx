@@ -33,6 +33,7 @@ import { NewsletterSubscribers } from './NewsletterSubscribers';
 import { AdminBookingModal } from './AdminBookingModal';
 import { ConfirmationModal } from './ConfirmationModal';
 import { VerifySlipsSection } from './VerifySlipsSection';
+import { SiteSettings } from './Admin/SiteSettings';
 import { toast } from 'sonner';
 import { useDashboardStats } from '../hooks/useDashboardStats';
 import { supabase } from '@/utils/supabase/client';
@@ -142,6 +143,7 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
   }, []);
 
   const loadToday = useCallback(async () => {
+    console.log('[AdminDashboard] Starting loadToday...');
     setTodaysClassesLoading(true);
     setTodaysClassesError(null);
     setTodaysBookingsLoading(true);
@@ -154,6 +156,11 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
       const end = new Date(now);
       end.setHours(23, 59, 59, 999);
 
+      console.log('[AdminDashboard] Fetching today\'s classes:', {
+        start: start.toISOString(),
+        end: end.toISOString(),
+      });
+
       const { data: classesData, error: classesError } = await supabase
         .from('classes')
         .select(
@@ -165,7 +172,17 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
         .lte('starts_at', end.toISOString())
         .order('starts_at', { ascending: true });
 
-      if (classesError) throw classesError;
+      if (classesError) {
+        console.error('[AdminDashboard] Error fetching classes:', {
+          message: classesError.message,
+          details: classesError.details,
+          hint: classesError.hint,
+          code: classesError.code,
+        });
+        throw classesError;
+      }
+
+      console.log('[AdminDashboard] Successfully fetched', classesData?.length ?? 0, 'classes');
 
       const mappedClasses: TodaysClassItem[] = (classesData ?? []).map((c: any) => {
         const startTime = new Date(c.starts_at);
@@ -193,17 +210,28 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
       }
 
       try {
+        console.log('[AdminDashboard] Fetching bookings for class IDs:', classIds);
         const { data: bookingsData, error: bookingsError } = await supabase
           .from('bookings')
           .select(
-            'id, class_id, user_id, status, is_attended, payment_status, amount_due, amount_paid, paid_at, guest_name, guest_contact, guest_health_condition, guest_avatar_url, profiles(id, full_name, avatar_url, health_condition)'
+            'id, class_id, user_id, status, is_attended, payment_status, amount_due, amount_paid, paid_at, guest_name, guest_contact, guest_health_condition, guest_avatar_url, profiles(id, full_name, avatar_url, health_condition, phone, contact_info)'
           )
           .in('class_id', classIds)
           .neq('status', 'cancelled')
           .is('cancelled_at', null)
           .order('id', { ascending: false });
 
-        if (bookingsError) throw bookingsError;
+        if (bookingsError) {
+          console.error('[AdminDashboard] Error fetching bookings:', {
+            message: bookingsError.message,
+            details: bookingsError.details,
+            hint: bookingsError.hint,
+            code: bookingsError.code,
+          });
+          throw bookingsError;
+        }
+
+        console.log('[AdminDashboard] Successfully fetched', bookingsData?.length ?? 0, 'bookings');
 
         const byClass: Record<number, AdminBooking[]> = {};
         for (const b of bookingsData ?? []) {
@@ -233,6 +261,29 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
             ? (b as any).guest_health_condition
             : profile?.health_condition;
 
+          // Unified contact info logic: member OR guest
+          const phone = isGuest
+            ? ((b as any).guest_contact || '')
+            : (profile?.phone || '');
+          
+          const contactInfo = isGuest
+            ? ''
+            : (profile?.contact_info || '');
+
+          // Detect contact platform from URL
+          let contactPlatform = '';
+          if (contactInfo) {
+            if (contactInfo.includes('line.me')) {
+              contactPlatform = 'line';
+            } else if (contactInfo.includes('wa.me') || contactInfo.includes('whatsapp')) {
+              contactPlatform = 'whatsapp';
+            } else if (contactInfo.includes('instagram')) {
+              contactPlatform = 'instagram';
+            } else if (contactInfo.includes('facebook')) {
+              contactPlatform = 'facebook';
+            }
+          }
+
           const classId = Number((b as any).class_id);
           byClass[classId] = byClass[classId] ?? [];
           byClass[classId].push({
@@ -240,9 +291,9 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
             studentId: String((b as any).user_id ?? ''),
             name: fullName,
             avatar: avatarUrl || initials,
-            phone: '',
-            contactInfo: '',
-            contactPlatform: '',
+            phone: phone,
+            contactInfo: contactInfo,
+            contactPlatform: contactPlatform,
             status: 'confirmed',
             bookingTime: '',
             class_id: classId,
@@ -553,7 +604,7 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
             recorded_by: user.id,
             currency: 'THB',
             note: `Payment recorded via admin dashboard for class booking #${bookingIdAsNumber}`
-          });
+          } as any);
 
         if (paymentError) {
           console.error('Failed to create payment record:', paymentError);
@@ -748,14 +799,14 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
         <div className="p-4 space-y-2">
           <button
             onClick={handleNavigateHome}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-[var(--color-stone)] hover:bg-[var(--color-cream)] transition-all duration-300"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-[var(--color-stone)] hover:bg-[var(--color-cream)] transition-colors duration-300"
           >
             <Home size={20} />
             <span>Back to Home</span>
           </button>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-600 hover:bg-red-50 transition-all duration-300"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-600 hover:bg-red-50 transition-colors duration-300"
           >
             <LogOut size={20} />
             <span>Logout</span>
@@ -1042,7 +1093,11 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
         )}
         {currentSection === 'reports' && <ReportsAnalytics />}
         {currentSection === 'subscribers' && <NewsletterSubscribers />}
-        {currentSection === 'settings' && renderPlaceholder('Settings')}
+        {currentSection === 'settings' && (
+          <div className="p-4 md:p-8">
+            <SiteSettings />
+          </div>
+        )}
       </main>
       
       {/* Create Class Modal */}

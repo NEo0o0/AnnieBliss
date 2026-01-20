@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useRouter } from 'next/navigation';
-import { Logo } from "./Logo";
+import Image from 'next/image';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/utils/supabase/client';
 
@@ -108,7 +108,18 @@ export function Navbar({
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex items-center justify-between h-20">
           {/* Logo - Clean Side-by-Side Layout */}
-          <Logo onClick={handleLogoClick} />
+          <div onClick={handleLogoClick} className="flex items-center gap-3 cursor-pointer group">
+            <Image 
+              src="/images/logo-white.svg" 
+              alt="Annie Bliss Logo" 
+              width={40} 
+              height={40} 
+              className="invert brightness-0 opacity-80 group-hover:opacity-100 transition-opacity"
+            />
+            <span className="text-xl font-serif font-semibold text-[var(--color-earth-dark)]">
+              Annie Bliss Yoga
+            </span>
+          </div>
 
           {/* Desktop Navigation */}
           <div className="hidden lg:flex items-center gap-8">
@@ -227,13 +238,21 @@ export function Navbar({
                 </button>
               </div>
             ) : (
-              <button
-                onClick={() => handleNavClick("login")}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-gradient-to-r from-[var(--color-sage)] to-[var(--color-clay)] text-white hover:opacity-90 transition-all duration-300 shadow-md hover:shadow-lg font-medium"
-              >
-                <LogIn size={18} strokeWidth={2} />
-                <span>Login</span>
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => router.push('/auth/register')}
+                  className="px-6 py-2.5 rounded-lg border-2 border-[var(--color-sage)] text-[var(--color-sage)] hover:bg-[var(--color-sage)] hover:text-white transition-all duration-300 font-medium"
+                >
+                  Sign Up
+                </button>
+                <button
+                  onClick={() => handleNavClick("login")}
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-gradient-to-r from-[var(--color-sage)] to-[var(--color-clay)] text-white hover:opacity-90 transition-all duration-300 shadow-md hover:shadow-lg font-medium"
+                >
+                  <LogIn size={18} strokeWidth={2} />
+                  <span>Login</span>
+                </button>
+              </div>
             )}
           </div>
 
@@ -329,13 +348,22 @@ export function Navbar({
                   ) : null}
                 </button>
               ) : (
-                <button
-                  onClick={() => handleNavClick("login")}
-                  className="w-full flex items-center justify-center gap-3 px-4 py-4 rounded-xl bg-gradient-to-r from-[var(--color-sage)] to-[var(--color-clay)] text-white hover:opacity-90 transition-all duration-300 shadow-lg font-medium mt-4"
-                >
-                  <LogIn size={20} strokeWidth={2} />
-                  <span>Login</span>
-                </button>
+                <div className="space-y-2 mt-4">
+                  <button
+                    onClick={() => router.push('/auth/register')}
+                    className="w-full flex items-center justify-center gap-3 px-4 py-4 rounded-xl border-2 border-[var(--color-sage)] text-[var(--color-sage)] hover:bg-[var(--color-sage)] hover:text-white transition-all duration-300 font-medium"
+                  >
+                    <User size={20} strokeWidth={2} />
+                    <span>Sign Up</span>
+                  </button>
+                  <button
+                    onClick={() => handleNavClick("login")}
+                    className="w-full flex items-center justify-center gap-3 px-4 py-4 rounded-xl bg-gradient-to-r from-[var(--color-sage)] to-[var(--color-clay)] text-white hover:opacity-90 transition-all duration-300 shadow-lg font-medium"
+                  >
+                    <LogIn size={20} strokeWidth={2} />
+                    <span>Login</span>
+                  </button>
+                </div>
               )}
 
               {user ? (

@@ -9,7 +9,7 @@ import { Avatar } from './Avatar';
 import { toast } from 'sonner';
 
 export function UserSettings() {
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     full_name: '',
@@ -48,7 +48,6 @@ export function UserSettings() {
       if (error) throw error;
 
       toast.success('Profile updated successfully!');
-      refreshProfile();
     } catch (error: any) {
       console.error('Error updating profile:', error);
       toast.error(error.message || 'Failed to update profile');

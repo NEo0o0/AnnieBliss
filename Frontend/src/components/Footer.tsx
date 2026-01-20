@@ -1,10 +1,16 @@
-import { Instagram, MessageCircle,MapPin } from 'lucide-react';
+'use client';
+
+import { Instagram, MessageCircle, MapPin, Mail, Phone } from 'lucide-react';
+import { useAppSettings } from '@/hooks';
+import Image from 'next/image';
 
 interface FooterProps {
   onNavigate?: (page: string) => void;
 }
 
 export function Footer({ onNavigate }: FooterProps) {
+  const { getSetting } = useAppSettings();
+  
   const navigationLinks = [
     { label: 'Home', page: 'home' },
     { label: 'Schedule', page: 'schedule' },
@@ -15,10 +21,14 @@ export function Footer({ onNavigate }: FooterProps) {
     { label: 'Contact', page: 'contact' },
   ];
 
+  const whatsappNumber = getSetting('whatsapp_number', '66844207947');
+  const contactEmail = getSetting('contact_email', 'info@anniebliss.com');
+  const contactPhone = getSetting('contact_phone', '+66 84 420 7947');
+
   const socialLinks = [
     { 
       icon: MessageCircle, 
-      href: 'https://wa.me/66844207947', 
+      href: `https://wa.me/${whatsappNumber}`, 
       label: 'WhatsApp',
       color: 'hover:bg-[#25D366]/20'
     },
@@ -31,7 +41,7 @@ export function Footer({ onNavigate }: FooterProps) {
     { 
       icon: MapPin, 
       href: 'https://maps.app.goo.gl/3cDFZzsVmXx6s32f6', 
-      label: 'MapPin',
+      label: 'Location',
       color: 'hover:bg-[#E4405F]/20'
     },
   ];
@@ -52,6 +62,13 @@ export function Footer({ onNavigate }: FooterProps) {
             <p className="text-white/70 text-sm">
               Creating a sanctuary for transformation through mindful movement and intentional practice.
             </p>
+             <Image 
+              src="/images/logo-white.svg" 
+              alt="Annie Bliss Yoga" 
+              width={148} 
+              height={148} 
+              className="mb-4 opacity-90" 
+            />
           </div>
 
           {/* Navigation */}

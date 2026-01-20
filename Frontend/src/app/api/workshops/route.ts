@@ -4,15 +4,14 @@ import { createSupabasePublicClient } from '@/utils/supabase/public';
 
 export const revalidate = 30;
 
-const WORKSHOP_CATEGORIES = ['Workshop', 'Retreat', 'Special Event'] as const;
-
 async function fetchWorkshopsFromDb() {
   const supabase = createSupabasePublicClient();
 
+  // Fetch workshops, retreats, and special events (exclude Teacher Training and regular Classes)
   const { data, error } = await supabase
     .from('classes')
     .select('*')
-    .in('category', [...WORKSHOP_CATEGORIES])
+    .in('category', ['Workshop', 'Retreat', 'Special Event'])
     .eq('is_cancelled', false)
     .order('starts_at', { ascending: true });
 

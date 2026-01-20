@@ -1,24 +1,38 @@
+'use client';
+
 import { ArrowRight } from 'lucide-react';
+import Image from 'next/image';
+import { useAppSettings } from '@/hooks';
 
 export function Hero() {
+  const { getSetting } = useAppSettings();
+  
+  const heroTitle = getSetting('home_hero_title', 'Find Your Balance');
+  const heroSubtitle = getSetting('home_hero_subtitle', 'Experience mindful movement and inner peace in a nurturing space designed for your wellness journey.');
+  const heroImage = getSetting('home_hero_image', '');
+
   return (
     <section className="relative h-screen w-full flex items-center justify-center overflow-hidden">
       {/* Background Image */}
-      <div className="absolute inset-0">
-        <img
-          src="https://images.unsplash.com/photo-1618425977996-bebc5afe88f9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx5b2dhJTIwbWVkaXRhdGlvbiUyMGNhbG18ZW58MXx8fHwxNzY2NDg0OTYwfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
-          alt="Peaceful yoga meditation"
-          className="w-full h-full object-cover"
-        />
-        {/* Overlay */}
-        <div className="absolute inset-0 bg-black/30"></div>
-      </div>
+      {heroImage && (
+        <div className="absolute inset-0">
+          <Image
+            src={heroImage}
+            alt="Peaceful yoga meditation"
+            fill
+            className="object-cover"
+            priority
+          />
+          {/* Overlay */}
+          <div className="absolute inset-0 bg-black/30"></div>
+        </div>
+      )}
 
       {/* Content */}
       <div className="relative z-10 text-center px-6 max-w-3xl">
-        <h1 className="text-white mb-6">Find Your Balance</h1>
+        <h1 className="text-white mb-6">{heroTitle}</h1>
         <p className="text-white/90 mb-8 max-w-xl mx-auto">
-          Experience mindful movement and inner peace in a nurturing space designed for your wellness journey.
+          {heroSubtitle}
         </p>
         <button className="bg-white text-[var(--color-earth-dark)] px-8 py-4 rounded-full hover:bg-[var(--color-sand)] transition-all duration-300 inline-flex items-center gap-2 shadow-lg">
           Start Your Journey

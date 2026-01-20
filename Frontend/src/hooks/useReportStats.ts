@@ -121,17 +121,51 @@ export function useReportStats() {
       });
       setError(null);
 
-      const { data, error: rpcError } = await supabase.rpc('get_monthly_financials', {
-        year_input: year,
-        month_input: month,
-      });
+      // Calculate date range for the month
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0, 23, 59, 59);
+
+      // Fetch revenue data from report_revenue view
+      const { data: revenueData, error: revenueError } = await supabase
+        .from('report_revenue')
+        .select('*')
+        .gte('transaction_date', startDate.toISOString())
+        .lte('transaction_date', endDate.toISOString());
 
       // Check if request was aborted
       if (controller.signal.aborted) return;
 
-      if (rpcError) throw rpcError;
+      if (revenueError) throw revenueError;
 
-      setMonthlyFinancials(data as unknown as MonthlyFinancials);
+      // Aggregate the data
+      const revenues = revenueData || [];
+      const totalRevenue = revenues.reduce((sum, r) => sum + (r.amount || 0), 0);
+      
+      // Calculate revenue by source
+      const dropinRevenue = revenues
+        .filter(r => (r as any).source === 'booking')
+        .reduce((sum, r) => sum + (r.amount || 0), 0);
+      
+      const packageRevenue = revenues
+        .filter(r => (r as any).source === 'package')
+        .reduce((sum, r) => sum + (r.amount || 0), 0);
+
+      // Calculate payment method breakdown
+      const paymentBreakdown = {
+        cash: revenues.filter(r => r.payment_method === 'cash').reduce((sum, r) => sum + (r.amount || 0), 0),
+        bank_transfer: revenues.filter(r => r.payment_method === 'bank_transfer').reduce((sum, r) => sum + (r.amount || 0), 0),
+        credit_card: revenues.filter(r => r.payment_method === 'credit_card' || r.payment_method === 'card').reduce((sum, r) => sum + (r.amount || 0), 0),
+        promptpay: revenues.filter(r => r.payment_method === 'promptpay').reduce((sum, r) => sum + (r.amount || 0), 0),
+      };
+
+      const financials: MonthlyFinancials = {
+        total_revenue: totalRevenue,
+        dropin_revenue: dropinRevenue,
+        package_revenue: packageRevenue,
+        payment_breakdown: paymentBreakdown,
+      };
+
+      setMonthlyFinancials(financials);
     } catch (err) {
       // Ignore abort errors
       if (controller.signal.aborted) return;
@@ -169,16 +203,86 @@ export function useReportStats() {
       });
       setError(null);
 
-      const { data, error: rpcError } = await supabase.rpc('get_yearly_report_stats', {
-        target_year: year,
-      });
+      // Calculate date range for the year
+      const startDate = new Date(year, 0, 1);
+      const endDate = new Date(year, 11, 31, 23, 59, 59);
+
+      // Fetch revenue data from report_revenue view
+      const { data: revenueData, error: revenueError } = await supabase
+        .from('report_revenue')
+        .select('*')
+        .gte('transaction_date', startDate.toISOString())
+        .lte('transaction_date', endDate.toISOString());
 
       // Check if request was aborted
       if (controller.signal.aborted) return;
 
-      if (rpcError) throw rpcError;
+      if (revenueError) throw revenueError;
 
-      setYearlyStats(data as unknown as YearlyReportStats);
+      // Fetch bookings count for the year
+      const { count: bookingsCount, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString())
+        .neq('status', 'cancelled');
+
+      if (bookingsError) throw bookingsError;
+
+      // Fetch unique members count
+      const { data: membersData, error: membersError } = await supabase
+        .from('bookings')
+        .select('user_id')
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString())
+        .not('user_id', 'is', null)
+        .neq('status', 'cancelled');
+
+      if (membersError) throw membersError;
+
+      const uniqueMembers = new Set((membersData || []).map(b => b.user_id)).size;
+
+      // Aggregate revenue by month
+      const revenues = revenueData || [];
+      const totalRevenue = revenues.reduce((sum, r) => sum + (r.amount || 0), 0);
+
+      // Group by month
+      const monthlyBreakdown: Array<{ month: number; bookings: number; revenue: number }> = [];
+      for (let month = 1; month <= 12; month++) {
+        const monthStart = new Date(year, month - 1, 1);
+        const monthEnd = new Date(year, month, 0, 23, 59, 59);
+
+        const monthRevenue = revenues
+          .filter(r => {
+            if (!r.transaction_date) return false;
+            const date = new Date(r.transaction_date);
+            return date >= monthStart && date <= monthEnd;
+          })
+          .reduce((sum, r) => sum + (r.amount || 0), 0);
+
+        // Get bookings count for this month
+        const { count: monthBookings } = await supabase
+          .from('bookings')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', monthStart.toISOString())
+          .lte('created_at', monthEnd.toISOString())
+          .neq('status', 'cancelled');
+
+        monthlyBreakdown.push({
+          month,
+          bookings: monthBookings || 0,
+          revenue: monthRevenue,
+        });
+      }
+
+      const yearlyStats: YearlyReportStats = {
+        total_bookings: bookingsCount || 0,
+        total_revenue: totalRevenue,
+        total_members: uniqueMembers,
+        monthly_breakdown: monthlyBreakdown,
+      };
+
+      setYearlyStats(yearlyStats);
     } catch (err) {
       // Ignore abort errors
       if (controller.signal.aborted) return;

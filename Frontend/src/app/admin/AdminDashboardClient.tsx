@@ -22,7 +22,7 @@ export function AdminDashboardClient() {
         </div>
         <button
           type="button"
-          onClick={refetch}
+          onClick={() => refetch()}
           className="px-4 py-2 rounded-lg border border-[var(--color-sand)] text-[var(--color-earth-dark)] hover:bg-[var(--color-cream)]/60 transition-colors"
         >
           Refresh

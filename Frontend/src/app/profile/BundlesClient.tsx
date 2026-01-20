@@ -36,8 +36,21 @@ export function BundlesClient({ bundles, activePackages, userId }: BundlesClient
     fetchUserName();
   }, []);
 
+  // Check if user has an active unlimited package (blocks ALL purchases)
+  const hasActiveUnlimitedPackage = () => {
+    return activePackages.some(pkg => {
+      if (!pkg.packages) return false;
+      return pkg.status === 'active' && pkg.packages.type === 'unlimited';
+    });
+  };
+
   // Check if user has an active package of the same type
   const hasActivePackageOfType = (packageType: 'credit' | 'unlimited') => {
+    // If user has active unlimited package, block all purchases
+    if (hasActiveUnlimitedPackage()) {
+      return true;
+    }
+
     return activePackages.some(pkg => {
       if (!pkg.packages) return false;
       // Check if package is active and same type
@@ -140,7 +153,11 @@ export function BundlesClient({ bundles, activePackages, userId }: BundlesClient
                     {hasActive && (
                       <div className="mt-2 flex items-center gap-2 text-xs text-green-700">
                         <CheckCircle size={14} />
-                        <span>You have an active {pkg.type} package</span>
+                        <span>
+                          {hasActiveUnlimitedPackage() && pkg.type !== 'unlimited'
+                            ? 'You have an active Unlimited package'
+                            : `You have an active ${pkg.type} package`}
+                        </span>
                       </div>
                     )}
                   </div>

@@ -7,6 +7,7 @@ import { LogoutButton } from './LogoutButton';
 import { ProfileClient } from './ProfileClient';
 import { BundlesClient } from './BundlesClient';
 import { ProfileEditClient } from './ProfileEditClient';
+import { MyPackagesClient } from './MyPackagesClient';
 
 type ProfileRow = Tables<'profiles'>;
 type BookingRow = Tables<'bookings'>;
@@ -129,42 +130,10 @@ export default async function ProfilePage() {
                 />
               }
               packages={
-                <div className="space-y-4">
-                  {activePackages.length === 0 ? (
-                    <div className="text-[var(--color-stone)] bg-[var(--color-cream)]/40 border border-[var(--color-sand)] rounded-xl p-6">
-                      No active packages found.
-                    </div>
-                  ) : (
-                    activePackages.map((up) => (
-                      <div
-                        key={up.id}
-                        className="p-4 border border-[var(--color-sand)] rounded-xl hover:shadow-md transition-all duration-300"
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <div className="text-[var(--color-earth-dark)] font-medium">
-                              {up.packages?.name ?? 'Package'}
-                            </div>
-                            <div className="text-sm text-[var(--color-stone)] mt-1">
-                              Expires: {formatDateTime(up.expire_at)}
-                            </div>
-                            <div className="mt-2 text-xs text-[var(--color-stone)]">
-                              Status: <span className="font-medium">{up.status}</span>
-                            </div>
-                          </div>
-                          {up.credits_remaining !== null ? (
-                            <div className="text-right">
-                              <div className="text-sm text-[var(--color-stone)]">Credits</div>
-                              <div className="text-2xl text-[var(--color-earth-dark)]">
-                                {up.credits_remaining}
-                              </div>
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+                <MyPackagesClient
+                  userPackages={userPackages ?? []}
+                  userId={user.id}
+                />
               }
               bundles={
                 <BundlesClient

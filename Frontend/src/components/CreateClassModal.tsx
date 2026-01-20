@@ -42,10 +42,11 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    category: 'class' as 'class' | 'workshop' | 'teacher_training' | 'retreat',
+    category: 'Class' as 'Class' | 'Workshop' | 'Teacher Training' | 'Retreat' | 'Special Event',
     classTypeId: '' as '' | string,
     title: '',
     date: '',
+    end_date: '',
     time: '',
     instructorId: '' as '' | string,
     level: 'All Levels',
@@ -55,7 +56,11 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
     long_description: '',
     cover_image_url: '',
     gallery_images: [] as string[],
-    room: ''
+    room: '',
+    price: '',
+    early_bird_price: '',
+    early_bird_deadline: '',
+    registration_opens_at: ''
   });
 
   const selectedClassType = useMemo(() => {
@@ -164,14 +169,19 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
     e.preventDefault();
     setSubmitError(null);
 
-    // Class type is required only for 'class' category
+    // Class type is required only for 'Class' category
     const classTypeId = formData.classTypeId ? Number(formData.classTypeId) : null;
-    if (formData.category === 'class' && !Number.isFinite(classTypeId)) {
+    if (formData.category === 'Class' && !Number.isFinite(classTypeId)) {
       setSubmitError('Please select a class type for regular classes');
       return;
     }
     if (!formData.date || !formData.time) {
       setSubmitError('Please select a date and time');
+      return;
+    }
+    // Validate end_date for Retreat and Teacher Training
+    if ((formData.category === 'Retreat' || formData.category === 'Teacher Training') && !formData.end_date) {
+      setSubmitError('End date is required for retreats and teacher training');
       return;
     }
     if (!formData.instructorId) {
@@ -186,7 +196,21 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
     }
 
     const durationMinutes = selectedClassType?.duration_minutes ?? parseDurationToMinutes(formData.duration);
-    const endsLocal = new Date(startsLocal.getTime() + durationMinutes * 60_000);
+    
+    // Calculate ends_at based on whether end_date is provided
+    let endsLocal: Date;
+    if (formData.end_date) {
+      // Multi-day event: end_date + time + duration
+      const endDateTime = new Date(`${formData.end_date}T${formData.time}`);
+      if (Number.isNaN(endDateTime.getTime())) {
+        setSubmitError('Invalid end date');
+        return;
+      }
+      endsLocal = new Date(endDateTime.getTime() + durationMinutes * 60_000);
+    } else {
+      // Single day event: start_date + time + duration
+      endsLocal = new Date(startsLocal.getTime() + durationMinutes * 60_000);
+    }
 
     setSubmitLoading(true);
     try {
@@ -203,10 +227,14 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
         class_type_id: classTypeId,
         starts_at: startsLocal.toISOString(),
         ends_at: endsLocal.toISOString(),
-        category: formData.category,
+        category: formData.category as any,
         location: formData.room,
         instructor_id: formData.instructorId,
         created_by: creatorId,
+        price: formData.price ? Number(formData.price) : null,
+        early_bird_price: formData.early_bird_price ? Number(formData.early_bird_price) : null,
+        early_bird_deadline: formData.early_bird_deadline || null,
+        registration_opens_at: formData.registration_opens_at || null,
       };
 
       const { error } = await supabase.from('classes').insert(insertPayload);
@@ -224,10 +252,36 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'capacity' ? parseInt(value) : value
-    }));
+    
+    // Handle category change - clear fields that don't apply to new category
+    if (name === 'category') {
+      setFormData(prev => {
+        const newData = { ...prev, category: value as typeof prev.category };
+        
+        // Clear fields based on category
+        if (value === 'Class') {
+          // Regular classes don't need price, early bird, or end date fields
+          newData.price = '';
+          newData.early_bird_price = '';
+          newData.early_bird_deadline = '';
+          newData.registration_opens_at = '';
+          newData.end_date = '';
+        } else if (value === 'Workshop') {
+          // Workshops need price but not early bird
+          newData.early_bird_price = '';
+          newData.early_bird_deadline = '';
+          newData.registration_opens_at = '';
+        }
+        // Retreats and Teacher Training keep all fields
+        
+        return newData;
+      });
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: name === 'capacity' ? parseInt(value) : value
+      }));
+    }
   };
 
   return (
@@ -263,23 +317,24 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
               required
               className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
             >
-              <option value="class">Class</option>
-              <option value="workshop">Workshop</option>
-              <option value="teacher_training">Teacher Training</option>
-              <option value="retreat">Retreat</option>
+              <option value="Class">Class</option>
+              <option value="Workshop">Workshop</option>
+              <option value="Teacher Training">Teacher Training</option>
+              <option value="Retreat">Retreat</option>
+              <option value="Special Event">Special Event</option>
             </select>
           </div>
 
           {/* Class Type */}
           <div>
             <label className="block text-sm text-[var(--color-stone)] mb-2">
-              Class Type {formData.category === 'class' ? '*' : '(Optional)'}
+              Class Type {formData.category === 'Class' ? '*' : '(Optional)'}
             </label>
             <select
               name="classTypeId"
               value={formData.classTypeId}
               onChange={handleChange}
-              required={formData.category === 'class'}
+              required={formData.category === 'Class'}
               className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
             >
               <option value="">{classTypesLoading ? 'Loading…' : 'Select a class type'}</option>
@@ -289,9 +344,9 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
                 </option>
               ))}
             </select>
-            {formData.category !== 'class' && (
+            {formData.category !== 'Class' && (
               <p className="mt-1 text-xs text-[var(--color-stone)]">
-                Class type is optional for {formData.category === 'workshop' ? 'workshops' : formData.category === 'teacher_training' ? 'teacher trainings' : 'retreats'}
+                Class type is optional for {formData.category === 'Workshop' ? 'workshops' : formData.category === 'Teacher Training' ? 'teacher trainings' : formData.category === 'Retreat' ? 'retreats' : 'special events'}
               </p>
             )}
             {classTypesError ? (
@@ -315,11 +370,11 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
             />
           </div>
 
-          {/* Day and Time Row */}
+          {/* Date Fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-[var(--color-stone)] mb-2">
-                Date *
+                Start Date *
               </label>
               <input
                 type="date"
@@ -331,19 +386,41 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
               />
             </div>
 
-            <div>
-              <label className="block text-sm text-[var(--color-stone)] mb-2">
-                Time *
-              </label>
-              <input
-                type="time"
-                name="time"
-                value={formData.time}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
-              />
-            </div>
+            {/* End Date - Show for Workshop, Retreat, Teacher Training, Special Event */}
+            {formData.category !== 'Class' && (
+              <div>
+                <label className="block text-sm text-[var(--color-stone)] mb-2">
+                  End Date {(formData.category === 'Retreat' || formData.category === 'Teacher Training') ? '*' : '(Optional)'}
+                </label>
+                <input
+                  type="date"
+                  name="end_date"
+                  value={formData.end_date}
+                  onChange={handleChange}
+                  required={formData.category === 'Retreat' || formData.category === 'Teacher Training'}
+                  min={formData.date}
+                  className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
+                />
+                <p className="mt-1 text-xs text-[var(--color-stone)]">
+                  Leave empty for single-day events
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Time */}
+          <div>
+            <label className="block text-sm text-[var(--color-stone)] mb-2">
+              Time *
+            </label>
+            <input
+              type="time"
+              name="time"
+              value={formData.time}
+              onChange={handleChange}
+              required
+              className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
+            />
           </div>
 
           {/* Instructor and Level Row */}
@@ -453,72 +530,148 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
             </div>
           </div>
 
+          {/* Price - Show for Workshop, Retreat, Teacher Training */}
+          {formData.category !== 'Class' && (
+            <div>
+              <label className="block text-sm text-[var(--color-stone)] mb-2">
+                Price (฿) *
+              </label>
+              <input
+                type="number"
+                name="price"
+                value={formData.price}
+                onChange={handleChange}
+                required
+                min="0"
+                step="0.01"
+                placeholder="e.g., 1500"
+                className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
+              />
+            </div>
+          )}
+
+          {/* Early Bird Fields - Show only for Retreat and Teacher Training */}
+          {(formData.category === 'Retreat' || formData.category === 'Teacher Training') && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-[var(--color-stone)] mb-2">
+                    Early Bird Price (฿)
+                  </label>
+                  <input
+                    type="number"
+                    name="early_bird_price"
+                    value={formData.early_bird_price}
+                    onChange={handleChange}
+                    min="0"
+                    step="0.01"
+                    placeholder="e.g., 1200"
+                    className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-[var(--color-stone)] mb-2">
+                    Early Bird Deadline
+                  </label>
+                  <input
+                    type="date"
+                    name="early_bird_deadline"
+                    value={formData.early_bird_deadline}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-[var(--color-stone)] mb-2">
+                  Registration Opens At
+                </label>
+                <input
+                  type="datetime-local"
+                  name="registration_opens_at"
+                  value={formData.registration_opens_at}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
+                />
+              </div>
+            </>
+          )}
+
           {/* Description */}
           <div>
             <label className="block text-sm text-[var(--color-stone)] mb-2">
-              Description *
+              Description {formData.category === 'Class' ? '*' : '(Short description)'}
             </label>
             <textarea
               name="description"
               value={formData.description}
               onChange={handleChange}
-              required
+              required={formData.category === 'Class'}
               rows={4}
               placeholder="Describe the class, what to expect, and who it's for..."
               className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300 resize-none"
             />
           </div>
 
-          {/* Long Description */}
-          <div>
-            <label className="block text-sm text-[var(--color-stone)] mb-2">
-              Long Description (Optional)
-            </label>
-            <textarea
-              name="long_description"
-              value={formData.long_description}
-              onChange={handleChange}
-              rows={6}
-              placeholder="Provide detailed information about what students will learn, class flow, benefits, etc..."
-              className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300 resize-none"
-            />
-          </div>
+          {/* Long Description - Show for Workshop, Retreat, Teacher Training */}
+          {formData.category !== 'Class' && (
+            <div>
+              <label className="block text-sm text-[var(--color-stone)] mb-2">
+                Long Description *
+              </label>
+              <textarea
+                name="long_description"
+                value={formData.long_description}
+                onChange={handleChange}
+                required
+                rows={6}
+                placeholder="Provide detailed information about what students will learn, class flow, benefits, etc..."
+                className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300 resize-none"
+              />
+            </div>
+          )}
 
-          {/* Cover Image Upload */}
-          <div>
-            <label className="block text-sm text-[var(--color-stone)] mb-2">
-              Cover Image (Optional)
-            </label>
-            <ImageUpload
-              currentImageUrl={formData.cover_image_url}
-              onUpload={(url) => {
-                setFormData(prev => ({
-                  ...prev,
-                  cover_image_url: url
-                }));
-              }}
-            />
-          </div>
+          {/* Cover Image Upload - Show for Workshop, Retreat, Special Event (NOT Teacher Training) */}
+          {(formData.category === 'Workshop' || formData.category === 'Retreat' || formData.category === 'Special Event') && (
+            <div>
+              <label className="block text-sm text-[var(--color-stone)] mb-2">
+                Cover Image *
+              </label>
+              <ImageUpload
+                currentImageUrl={formData.cover_image_url}
+                onUpload={(url) => {
+                  setFormData(prev => ({
+                    ...prev,
+                    cover_image_url: url
+                  }));
+                }}
+              />
+            </div>
+          )}
 
-          {/* Gallery Images */}
-          <div>
-            <label className="block text-sm text-[var(--color-stone)] mb-2">
-              Gallery Images (Optional)
-            </label>
-            <p className="text-xs text-[var(--color-stone)] mb-3">
-              Upload multiple images to showcase this class/workshop in a gallery slideshow
-            </p>
-            <MultiImageUpload
-              images={formData.gallery_images}
-              onImagesChange={(images) => {
-                setFormData(prev => ({
-                  ...prev,
-                  gallery_images: images
-                }));
-              }}
-              maxImages={10}
-            />
-          </div>
+          {/* Gallery Images - Show for Workshop, Retreat, Special Event (NOT Teacher Training) */}
+          {(formData.category === 'Workshop' || formData.category === 'Retreat' || formData.category === 'Special Event') && (
+            <div>
+              <label className="block text-sm text-[var(--color-stone)] mb-2">
+                Gallery Images (Optional)
+              </label>
+              <p className="text-xs text-[var(--color-stone)] mb-3">
+                Upload multiple images to showcase this class/workshop in a gallery slideshow
+              </p>
+              <MultiImageUpload
+                images={formData.gallery_images}
+                onImagesChange={(images) => {
+                  setFormData(prev => ({
+                    ...prev,
+                    gallery_images: images
+                  }));
+                }}
+                maxImages={10}
+              />
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex gap-4 pt-4">

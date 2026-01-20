@@ -44,6 +44,7 @@ export function PaymentMethodSelector({
   const [showTransferInfo, setShowTransferInfo] = useState(false);
   const [paymentNote, setPaymentNote] = useState('');
   const [paymentSlipUrl, setPaymentSlipUrl] = useState('');
+  const [hasSlipFile, setHasSlipFile] = useState(false);
   const [transferMethod, setTransferMethod] = useState<'bank_transfer' | 'promptpay'>('bank_transfer');
   const [showGuestForm, setShowGuestForm] = useState(false);
   const [guestName, setGuestName] = useState('');
@@ -477,7 +478,10 @@ export function PaymentMethodSelector({
                 <PaymentSlipUpload
                   userId={userId}
                   currentSlipUrl={paymentSlipUrl}
-                  onUploadComplete={(url) => setPaymentSlipUrl(url)}
+                  onUploadComplete={(url) => {
+                    setPaymentSlipUrl(url);
+                    setHasSlipFile(true);
+                  }}
                 />
               )}
             </div>
@@ -488,16 +492,33 @@ export function PaymentMethodSelector({
               </p>
             </div>
 
+            {/* Validation Message */}
+            {!hasSlipFile && !paymentSlipUrl && (
+              <div className="bg-orange-50 border border-orange-200 p-3 rounded-lg mb-4">
+                <p className="text-sm text-orange-800">
+                  ⚠️ Please upload your payment slip to confirm booking
+                </p>
+              </div>
+            )}
+
             <div className="flex gap-3">
               <button
-                onClick={() => setShowTransferInfo(false)}
+                onClick={() => {
+                  setShowTransferInfo(false);
+                  setHasSlipFile(false);
+                }}
                 className="flex-1 px-4 py-3 border-2 border-[var(--color-sand)] rounded-lg hover:border-[var(--color-sage)] transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleTransferConfirm}
-                className="flex-1 px-4 py-3 bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white rounded-lg transition-colors"
+                disabled={!hasSlipFile && !paymentSlipUrl}
+                className={`flex-1 px-4 py-3 rounded-lg transition-colors ${
+                  !hasSlipFile && !paymentSlipUrl
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-50'
+                    : 'bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white'
+                }`}
               >
                 Confirm Booking
               </button>

@@ -30,21 +30,37 @@ export function useDashboardStats() {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
+    // Query report_revenue view for all revenue (packages + bookings)
     const { data, error: revenueError } = await supabase
-      .from('bookings')
-      .select('amount_paid, amount_due, status, created_at')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .eq('payment_status' as any, 'paid' as any)
-      .neq('status', 'cancelled')
-      .gte('created_at', startOfMonth.toISOString())
-      .lte('created_at', endOfMonth.toISOString());
+      .from('report_revenue')
+      .select('amount')
+      .gte('transaction_date', startOfMonth.toISOString())
+      .lte('transaction_date', endOfMonth.toISOString());
 
     if (revenueError) throw revenueError;
 
     return (data ?? []).reduce((sum: number, row: any) => {
-      // Use amount_paid if available, otherwise fall back to amount_due
-      const amount = Number(row?.amount_paid ?? row?.amount_due ?? 0);
-      return sum + amount;
+      return sum + (Number(row?.amount) || 0);
+    }, 0);
+  };
+
+  const fetchTodayRevenue = async (): Promise<number> => {
+    // Get today's date range
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+    // Query report_revenue view for today's revenue
+    const { data, error: revenueError } = await supabase
+      .from('report_revenue')
+      .select('amount')
+      .gte('transaction_date', startOfDay.toISOString())
+      .lte('transaction_date', endOfDay.toISOString());
+
+    if (revenueError) throw revenueError;
+
+    return (data ?? []).reduce((sum: number, row: any) => {
+      return sum + (Number(row?.amount) || 0);
     }, 0);
   };
 
@@ -126,15 +142,17 @@ export function useDashboardStats() {
       if (rpcError) throw rpcError;
 
       const revenue = await fetchRevenue();
+      const todayRevenue = await fetchTodayRevenue();
       const activeMembers = await fetchActiveMembers();
 
       // Check again after async operations
       if (controller.signal.aborted) return;
       
-      // Override active_members with our client-side calculation that handles unlimited packages
+      // Override with our client-side calculations
       setStats({ 
         ...(data as unknown as DashboardStats), 
         revenue,
+        today_revenue: todayRevenue,
         active_members: activeMembers 
       });
     } catch (err) {

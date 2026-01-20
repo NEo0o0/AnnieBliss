@@ -17,11 +17,14 @@ export function AuthExample() {
   } = useAuth();
 
   const handleSignUp = async () => {
-    const { data, error } = await signUp(
-      'newuser@example.com',
-      'securePassword123',
-      'John Doe'
-    );
+    const { data, error } = await signUp({
+      email: 'newuser@example.com',
+      password: 'securePassword123',
+      fullName: 'John Doe',
+      phone: '',
+      contactInfo: '',
+      contactPlatform: 'whatsapp'
+    });
     
     if (error) {
       console.error('Sign up failed:', error.message);
@@ -31,10 +34,7 @@ export function AuthExample() {
   };
 
   const handleSignIn = async () => {
-    const { data, error } = await signIn(
-      'user@example.com',
-      'password123'
-    );
+    const { data, error } = await signIn('user@example.com', 'password123');
     
     if (error) {
       console.error('Login failed:', error.message);
@@ -199,7 +199,7 @@ export function BookingFlowExample({ classId }: { classId: number }) {
     const { data, error } = await createBooking({
       user_id: user.id,
       class_id: classId,
-      kind: 'drop_in',
+      kind: 'dropin',
       status: 'booked',
       payment_status: 'unpaid',
       amount_due: dropInPrice,
@@ -299,7 +299,7 @@ export function PackageManagementExample() {
         {packages.map(pkg => (
           <div key={pkg.id} style={{ border: '2px solid #ddd', padding: '20px', borderRadius: '8px' }}>
             <h3>{pkg.name}</h3>
-            <p>Type: {pkg.type === 'credits' ? '📊 Credit-based' : '♾️ Unlimited'}</p>
+            <p>Type: {pkg.type === 'credit' ? '📊 Credit-based' : '♾️ Unlimited'}</p>
             {pkg.credits && <p>Credits: {pkg.credits}</p>}
             <p>Duration: {pkg.duration_days} days</p>
             <p style={{ fontSize: '24px', fontWeight: 'bold' }}>฿{pkg.price}</p>

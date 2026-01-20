@@ -70,8 +70,8 @@ export function usePayments(options: UsePaymentsOptions = {}) {
           p_booking_id: paymentData.booking_id,
           p_amount: paymentData.amount,
           p_method: paymentData.method,
-          p_evidence_url: paymentData.evidence_url || null,
-          p_note: paymentData.note || null,
+          p_evidence_url: paymentData.evidence_url || undefined,
+          p_note: paymentData.note || undefined,
         });
 
         if (rpcError) throw rpcError;
@@ -124,11 +124,11 @@ export function usePayments(options: UsePaymentsOptions = {}) {
   };
 
   const verifyPayment = async (id: number) => {
-    return updatePayment(id, { log_status: 'verified' });
+    return updatePayment(id, { log_status: 'recorded' as any });
   };
 
   const disputePayment = async (id: number) => {
-    return updatePayment(id, { log_status: 'disputed' });
+    return updatePayment(id, { log_status: 'void' as any });
   };
 
   return {

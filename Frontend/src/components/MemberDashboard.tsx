@@ -377,7 +377,6 @@ export function MemberDashboard({ userData, onLogout, onNavigateToAdmin, onNavig
                   </div>
                   
                   <button 
-                    onClick={handleBuyPackage}
                     onClick={() => setShowBuyPackageModal(true)}
                     className="w-full bg-white text-[var(--color-sage)] py-3 rounded-lg hover:bg-white/90 transition-all duration-300 flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
                   >
@@ -439,7 +438,6 @@ export function MemberDashboard({ userData, onLogout, onNavigateToAdmin, onNavig
 
                   {/* Buy Package Button (Secondary Style for Top-ups) */}
                   <button 
-                    onClick={handleBuyPackage}
                     onClick={() => setShowBuyPackageModal(true)}
                     className="w-full bg-white/20 backdrop-blur-sm text-white py-3 rounded-lg hover:bg-white/30 transition-all duration-300 flex items-center justify-center gap-2 border border-white/30"
                   >
@@ -696,7 +694,6 @@ export function MemberDashboard({ userData, onLogout, onNavigateToAdmin, onNavig
         <BuyPackageModal
           isOpen={showBuyPackageModal}
           onClose={() => setShowBuyPackageModal(false)}
-          onBuyPackage={handleBuyPackage}
           userId={userData.id}
           userName={userData.name}
         />

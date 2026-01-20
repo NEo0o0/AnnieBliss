@@ -85,6 +85,7 @@ export function BuyPackageModal({ isOpen, onClose, userId, userName }: BuyPackag
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
@@ -109,30 +110,58 @@ export function BuyPackageModal({ isOpen, onClose, userId, userName }: BuyPackag
     if (!uploadedFile || !selectedPackage) return;
 
     setIsSubmitting(true);
+    setSubmissionError(null);
 
     try {
-      // In real app:
       // 1. Upload image to Supabase Storage bucket 'payment_slips'
-      // 2. Get the uploaded image URL
-      // 3. Create record in payments table with:
-      //    - user_id, amount, payment_method: 'transfer', status: 'pending'
-      //    - proof_url, package_id
+      const { supabase } = await import('@/utils/supabase/client');
+      
+      const fileExt = uploadedFile.name.split('.').pop();
+      const fileName = `${userId}_${Date.now()}.${fileExt}`;
+      const filePath = `payment_slips/${fileName}`;
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const { error: uploadError } = await supabase.storage
+        .from('payment_slips')
+        .upload(filePath, uploadedFile, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
-      console.log('Payment submitted:', {
-        userId,
-        packageId: selectedPackage.id,
-        amount: selectedPackage.price,
-        paymentMethod: 'transfer',
-        file: uploadedFile.name
+      if (uploadError) {
+        throw new Error(`Upload failed: ${uploadError.message}`);
+      }
+
+      // 2. Get the public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('payment_slips')
+        .getPublicUrl(filePath);
+
+      // 3. Call API to create user_package with payment data
+      const response = await fetch('/api/packages/buy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          packageId: selectedPackage.id,
+          paymentMethod: 'bank_transfer',
+          paymentSlipUrl: publicUrl,
+          paymentNote: `Package purchase: ${selectedPackage.name}`,
+        }),
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to submit payment');
+      }
+
+      const result = await response.json();
+      console.log('Payment submitted successfully:', result);
+
       setStep('success');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting payment:', error);
-      alert('Failed to submit payment. Please try again.');
+      setSubmissionError(error.message || 'Failed to submit payment. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -218,7 +247,12 @@ export function BuyPackageModal({ isOpen, onClose, userId, userName }: BuyPackag
     setPaymentMethod('transfer');
     setUploadedFile(null);
     setPreviewUrl(null);
+    setSubmissionError(null);
     onClose();
+  };
+
+  const handleReload = () => {
+    window.location.reload();
   };
 
   return (
@@ -438,11 +472,39 @@ export function BuyPackageModal({ isOpen, onClose, userId, userName }: BuyPackag
                     </p>
                   </div>
 
+                  {/* Error Message */}
+                  {submissionError && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-red-800 text-sm flex-1">{submissionError}</p>
+                        <button
+                          onClick={handleReload}
+                          className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors flex-shrink-0"
+                        >
+                          Reload Page
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Validation Warning */}
+                  {!uploadedFile && (
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                      <p className="text-sm text-orange-800">
+                        ⚠️ Please upload your payment slip to submit
+                      </p>
+                    </div>
+                  )}
+
                   {/* Submit Button */}
                   <button
                     onClick={handleSubmitBankTransfer}
                     disabled={!uploadedFile || isSubmitting}
-                    className="w-full bg-[var(--color-sage)] text-white py-4 rounded-lg hover:bg-[var(--color-clay)] transition-all duration-300 flex items-center justify-center gap-2 disabled:bg-gray-300 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
+                    className={`w-full py-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-md ${
+                      !uploadedFile || isSubmitting
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-50'
+                        : 'bg-[var(--color-sage)] text-white hover:bg-[var(--color-clay)] hover:shadow-lg'
+                    }`}
                   >
                     {isSubmitting ? (
                       <>

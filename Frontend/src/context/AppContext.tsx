@@ -19,6 +19,7 @@ interface WeeklySlot {
   time: string; // e.g., "09:00 AM"
   instructorId: string;
   room: string;
+  capacity?: number;
 }
 
 // UI-friendly class interface for mock data

@@ -344,7 +344,7 @@ export function ScheduleGeneratorTab() {
       const slotsForDay = weeklySlots.filter(slot => slot.day === dayName);
 
       slotsForDay.forEach(slot => {
-        const classType = classTypes.find(ct => ct.id === slot.classTypeId);
+        const classType = classTypes.find(ct => String(ct.id) === slot.classTypeId);
         const instructor = instructors.find(i => i.id === slot.instructorId);
 
         if (classType && instructor) {
@@ -352,12 +352,12 @@ export function ScheduleGeneratorTab() {
             title: classType.title,
             time: slot.time,
             instructor: instructor.name,
-            level: classType.level,
+            level: classType.level || 'All Levels',
             capacity: 20,
             enrolled: 0,
             day: dayName,
-            duration: `${classType.defaultDuration} min`,
-            description: classType.description,
+            duration: `${classType.duration_minutes || 60} min`,
+            description: classType.description || '',
             room: slot.room,
             category: 'class'
           });
@@ -388,11 +388,11 @@ export function ScheduleGeneratorTab() {
   };
 
   const getClassTypeName = (classTypeId: string) => {
-    return classTypes.find(ct => ct.id === classTypeId)?.title || 'Unknown';
+    return classTypes.find(ct => String(ct.id) === classTypeId)?.title || 'Unknown';
   };
 
   const getClassTypeColor = (classTypeId: string) => {
-    return classTypes.find(ct => ct.id === classTypeId)?.color || '#8CA899';
+    return classTypes.find(ct => String(ct.id) === classTypeId)?.color_code || '#8CA899';
   };
 
   const getInstructorName = (instructorId: string) => {

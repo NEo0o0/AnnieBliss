@@ -23,6 +23,7 @@ export function WeeklySchedule({ onNavigate, initialClasses }: WeeklySchedulePro
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentWeekStart, setCurrentWeekStart] = useState(getWeekStart(new Date()));
   const [selectedClass, setSelectedClass] = useState<DbClass | null>(null);
+  const [timeoutError, setTimeoutError] = useState(false);
 
   // Calculate dynamic date range based on viewMode
   const dateRange = useMemo(() => {
@@ -66,6 +67,23 @@ export function WeeklySchedule({ onNavigate, initialClasses }: WeeklySchedulePro
   useEffect(() => {
     fetchClasses();
   }, [dateRange.startDate, dateRange.endDate]);
+
+  // Timeout fallback: Force loading to stop after 10 seconds
+  useEffect(() => {
+    if (!loading) {
+      setTimeoutError(false);
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      if (loading) {
+        console.error('[WeeklySchedule] Loading timeout after 10 seconds');
+        setTimeoutError(true);
+      }
+    }, 10000);
+
+    return () => clearTimeout(timeoutId);
+  }, [loading]);
 
   // Transform database classes to UI format with null-safe handling
   const classes = useMemo(() => {
@@ -227,6 +245,26 @@ export function WeeklySchedule({ onNavigate, initialClasses }: WeeklySchedulePro
             className="px-6 py-2 bg-[var(--color-sage)] text-white rounded-lg hover:bg-[var(--color-clay)] transition-colors"
           >
             Retry
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  if (timeoutError) {
+    return (
+      <section className="py-20 px-6 bg-white">
+        <div className="max-w-6xl mx-auto text-center">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <Calendar size={28} className="text-orange-500" />
+            <h2 className="text-[var(--color-earth-dark)]">Request Timed Out</h2>
+          </div>
+          <p className="text-orange-600 mb-4">The request took too long to complete. Please refresh the page.</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-2 bg-[var(--color-sage)] text-white rounded-lg hover:bg-[var(--color-clay)] transition-colors"
+          >
+            Refresh Page
           </button>
         </div>
       </section>

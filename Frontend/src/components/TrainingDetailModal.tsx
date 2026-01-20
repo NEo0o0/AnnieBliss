@@ -126,8 +126,16 @@ export function TrainingDetailModal({ training, onClose }: TrainingDetailModalPr
       setBookingLoading(true);
       setBookingError(null);
 
-      const paymentStatus = method === 'cash' ? 'unpaid' : 'paid';
       const paymentMethodValue = method === 'package' ? 'other' : method;
+
+      let paymentStatus = 'unpaid';
+      if (slipUrl) {
+        paymentStatus = 'partial'; // Has slip - awaiting verification
+      } else if (method === 'cash') {
+        paymentStatus = 'unpaid'; // Cash - no slip needed
+      } else {
+        paymentStatus = 'pending_verification'; // Bank transfer - waiting for slip
+      }
 
       const result = await createBooking({
         user_id: user.id,
@@ -135,8 +143,9 @@ export function TrainingDetailModal({ training, onClose }: TrainingDetailModalPr
         kind: 'dropin',
         status: 'booked',
         amount_due: amountDueToday,
+        amount_paid: 0,
         payment_method: paymentMethodValue,
-        payment_status: paymentStatus,
+        payment_status: paymentStatus as 'unpaid' | 'partial' | 'pending_verification',
         payment_note: paymentNote,
         payment_slip_url: slipUrl,
       });
@@ -444,7 +453,15 @@ export function TrainingDetailModal({ training, onClose }: TrainingDetailModalPr
           <div className="border-t border-[var(--color-sand)] pt-6">
             {bookingError && (
               <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                <p className="text-sm">{bookingError}</p>
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm flex-1">{bookingError}</p>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors flex-shrink-0"
+                  >
+                    Reload Page
+                  </button>
+                </div>
               </div>
             )}
 

@@ -53,7 +53,7 @@ export function EventDetailModal({ event, onClose, onNavigate }: EventDetailModa
     setShowPaymentSelector(true);
   };
 
-  const handlePaymentSelect = async (method: 'package' | 'cash' | 'bank_transfer' | 'promptpay', paymentNote?: string) => {
+  const handlePaymentSelect = async (method: 'package' | 'cash' | 'bank_transfer' | 'promptpay', paymentNote?: string, slipUrl?: string) => {
     if (!user) return;
 
     try {
@@ -66,9 +66,19 @@ export function EventDetailModal({ event, onClose, onNavigate }: EventDetailModa
         kind: 'dropin',
         amount_due: workshopPrice,
         payment_method: method,
-        payment_status: 'unpaid',
         payment_note: paymentNote,
+        payment_slip_url: slipUrl,
+        amount_paid: 0,
       };
+
+      // Set payment_status based on whether slip was uploaded
+      if (slipUrl) {
+        bookingData.payment_status = 'partial'; // Has slip - awaiting verification
+      } else if (method === 'cash') {
+        bookingData.payment_status = 'unpaid'; // Cash - no slip needed
+      } else {
+        bookingData.payment_status = 'pending_verification'; // Bank transfer - waiting for slip
+      }
 
       const result = await createBooking(bookingData);
 
@@ -285,7 +295,15 @@ export function EventDetailModal({ event, onClose, onNavigate }: EventDetailModa
           {/* Booking Error Message */}
           {bookingError && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-800 text-sm">{bookingError}</p>
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-red-800 text-sm flex-1">{bookingError}</p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors flex-shrink-0"
+                >
+                  Reload Page
+                </button>
+              </div>
             </div>
           )}
 

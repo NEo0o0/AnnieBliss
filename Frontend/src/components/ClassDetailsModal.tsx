@@ -128,12 +128,21 @@ export function ClassDetailsModal({ classData, onClose, onNavigate, onBookingSuc
         bookingData.payment_method = 'package';
         bookingData.user_package_id = userPackage?.id;
       } else {
-        // Transfer/Cash/PromptPay - payment_status is 'unpaid' initially
+        // Transfer/Cash/PromptPay
         bookingData.kind = 'dropin';
         bookingData.payment_method = method;
-        bookingData.payment_status = 'unpaid';
         bookingData.payment_note = paymentNote;
         bookingData.payment_slip_url = slipUrl;
+        bookingData.amount_paid = 0;
+        
+        // Set payment_status based on whether slip was uploaded
+        if (slipUrl) {
+          bookingData.payment_status = 'partial'; // Has slip - awaiting verification
+        } else if (method === 'cash') {
+          bookingData.payment_status = 'unpaid'; // Cash - no slip needed
+        } else {
+          bookingData.payment_status = 'pending_verification'; // Bank transfer - waiting for slip
+        }
       }
 
       const result = await createBooking(bookingData);
@@ -439,7 +448,15 @@ export function ClassDetailsModal({ classData, onClose, onNavigate, onBookingSuc
             {/* Booking Error Message */}
             {bookingError && (
               <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-red-800 text-sm">{bookingError}</p>
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-red-800 text-sm flex-1">{bookingError}</p>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors flex-shrink-0"
+                  >
+                    Reload Page
+                  </button>
+                </div>
               </div>
             )}
 

@@ -40,6 +40,7 @@ export default async function VerifySlipsPage() {
       )
     `)
     .filter('payment_status', 'eq', 'partial')
+    .not('user_id', 'is', null)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -74,7 +75,7 @@ export default async function VerifySlipsPage() {
         </div>
 
         <VerifySlipsClient 
-          initialBookings={pendingBookings || []} 
+          initialBookings={(pendingBookings || []).filter(b => b.user_id !== null) as any} 
           userId={user.id}
         />
       </div>

@@ -12,3 +12,4 @@ export { useWorkshops } from './useWorkshops';
 export { useTeacherTraining } from './useTeacherTraining';
 export { useRooms } from './useRooms';
 export { useReports } from './useReports';
+export { useAppSettings } from './useAppSettings';

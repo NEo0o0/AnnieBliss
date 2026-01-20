@@ -16,7 +16,7 @@ function formatCurrencyTHB(value: number | null) {
 }
 
 function formatPackageType(pkg: PackageRow) {
-  if (pkg.type === 'credits') return 'Credits';
+  if (pkg.type === 'credit') return 'Credits';
   if (pkg.type === 'unlimited') return 'Unlimited';
   return pkg.type ? String(pkg.type) : 'Unknown';
 }
