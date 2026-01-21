@@ -364,19 +364,37 @@ export function WeeklySchedule({ onNavigate, initialClasses }: WeeklySchedulePro
 
             {/* View Mode Switcher */}
             <div className="flex items-center gap-2 bg-[var(--color-cream)] rounded-lg p-1">
-              {(['day', 'week', 'month'] as ViewMode[]).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => setViewMode(mode)}
-                  className={`px-6 py-2 rounded-lg transition-all duration-300 capitalize ${
-                    viewMode === mode
-                      ? 'bg-[var(--color-sage)] text-white shadow-md'
-                      : 'text-[var(--color-stone)] hover:text-[var(--color-earth-dark)]'
-                  }`}
-                >
-                  {mode}
-                </button>
-              ))}
+              {(['day', 'week', 'month'] as ViewMode[]).map((mode) => {
+                // Hide month view on mobile (sm and md screens)
+                if (mode === 'month') {
+                  return (
+                    <button
+                      key={mode}
+                      onClick={() => setViewMode(mode)}
+                      className={`hidden lg:block px-6 py-2 rounded-lg transition-all duration-300 capitalize ${
+                        viewMode === mode
+                          ? 'bg-[var(--color-sage)] text-white shadow-md'
+                          : 'text-[var(--color-stone)] hover:text-[var(--color-earth-dark)]'
+                      }`}
+                    >
+                      {mode}
+                    </button>
+                  );
+                }
+                return (
+                  <button
+                    key={mode}
+                    onClick={() => setViewMode(mode)}
+                    className={`px-6 py-2 rounded-lg transition-all duration-300 capitalize ${
+                      viewMode === mode
+                        ? 'bg-[var(--color-sage)] text-white shadow-md'
+                        : 'text-[var(--color-stone)] hover:text-[var(--color-earth-dark)]'
+                    }`}
+                  >
+                    {mode}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

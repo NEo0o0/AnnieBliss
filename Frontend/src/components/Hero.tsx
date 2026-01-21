@@ -2,9 +2,11 @@
 
 import { ArrowRight } from 'lucide-react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { useAppSettings } from '@/hooks';
 
 export function Hero() {
+  const router = useRouter();
   const { getSetting } = useAppSettings();
   
   const heroTitle = getSetting('home_hero_title', 'Find Your Balance');
@@ -34,7 +36,10 @@ export function Hero() {
         <p className="text-white/90 mb-8 max-w-xl mx-auto">
           {heroSubtitle}
         </p>
-        <button className="bg-white text-[var(--color-earth-dark)] px-8 py-4 rounded-full hover:bg-[var(--color-sand)] transition-all duration-300 inline-flex items-center gap-2 shadow-lg">
+        <button 
+          onClick={() => router.push('/schedule')}
+          className="bg-white text-[var(--color-earth-dark)] px-8 py-4 rounded-full hover:bg-[var(--color-sand)] transition-all duration-300 inline-flex items-center gap-2 shadow-lg"
+        >
           Start Your Journey
           <ArrowRight size={20} />
         </button>

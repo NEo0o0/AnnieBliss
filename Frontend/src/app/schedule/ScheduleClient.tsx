@@ -4,6 +4,8 @@ import { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ClassesHero } from '@/components/ClassesHero';
 import { WeeklySchedule } from '@/components/WeeklySchedule';
+import { ClassRules } from '@/components/ClassRules';
+import { CancellationPolicy } from '@/components/CancellationPolicy';
 import { ClassTypes } from '@/components/ClassTypes';
 import type { Tables } from '@/types/database.types';
 
@@ -58,6 +60,13 @@ export function ScheduleClient({ initialClasses }: ScheduleClientProps) {
     <>
       <ClassesHero />
       <WeeklySchedule onNavigate={onNavigate} initialClasses={initialClasses} />
+      
+      {/* Studio Guidelines */}
+      <div className="max-w-6xl mx-auto px-6 py-12 space-y-12">
+        <ClassRules />
+        <CancellationPolicy />
+      </div>
+      
       <ClassTypes onNavigate={onNavigate} />
     </>
   );

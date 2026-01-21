@@ -233,6 +233,46 @@ export function Pricing({ isAuthenticated, initialPackages }: PricingProps) {
               <p className="text-[var(--color-stone)]">Purchase credits and use them for any class</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {/* Static Drop-in Card */}
+              <div className="relative bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden group hover:-translate-y-2">
+                <div className="p-8">
+                  <div className="w-16 h-16 rounded-full flex items-center justify-center mb-6 bg-[var(--color-sand)]">
+                    <Package size={32} className="text-[var(--color-earth-dark)]" />
+                  </div>
+                  <h3 className="mb-6 text-[var(--color-earth-dark)]">Drop-in</h3>
+                  <div className="mb-6">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-5xl font-bold text-[var(--color-earth-dark)]">฿400</span>
+                    </div>
+                  </div>
+                  <div className="space-y-3 mb-8">
+                    <div className="flex items-center gap-3 text-[var(--color-stone)]">
+                      <Check size={20} className="text-[var(--color-sage)] flex-shrink-0" />
+                      <span>Single class access</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-[var(--color-stone)]">
+                      <Check size={20} className="text-[var(--color-sage)] flex-shrink-0" />
+                      <span>Valid for 1 day</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-[var(--color-stone)]">
+                      <Check size={20} className="text-[var(--color-sage)] flex-shrink-0" />
+                      <span>Pay at studio</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-[var(--color-stone)]">
+                      <Check size={20} className="text-[var(--color-sage)] flex-shrink-0" />
+                      <span>No commitment required</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => router.push('/schedule')}
+                    className="w-full py-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-3 group/btn shadow-md hover:shadow-lg bg-[var(--color-sage)] text-white hover:bg-[var(--color-clay)]"
+                  >
+                    <span className="font-semibold text-lg">Book Now</span>
+                    <ArrowRight size={20} className="group-hover/btn:translate-x-1 transition-transform" />
+                  </button>
+                </div>
+              </div>
+              
               {categorizedPackages.creditPacks.map(renderPackageCard)}
             </div>
           </div>

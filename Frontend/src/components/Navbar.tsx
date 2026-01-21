@@ -112,12 +112,12 @@ export function Navbar({
             <Image 
               src="/images/logo-white.svg" 
               alt="Annie Bliss Logo" 
-              width={40} 
-              height={40} 
-              className="invert brightness-0 opacity-80 group-hover:opacity-100 transition-opacity"
+              width={70} 
+              height={70} 
+              className=" brightness-100 opacity-70 group-hover:opacity-100 transition-opacity"
             />
-            <span className="text-xl font-serif font-semibold text-[var(--color-earth-dark)]">
-              Annie Bliss Yoga
+            <span className="text-xl font-medium font-bold text-[var(--color-earth-light)]  opacity-75 group-hover:opacity-100 transition-opacity">
+              Annie Bliss
             </span>
           </div>
 

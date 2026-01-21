@@ -1,4 +1,4 @@
-import { Clock, Volume2, Shirt, Flower2, Users2, Sparkle } from 'lucide-react';
+import { Clock, Volume2, Shirt, Flower2, Users2, Sparkle, AlertCircle } from 'lucide-react';
 
 const rules = [
   {
@@ -59,6 +59,21 @@ export function ClassRules() {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Late Policy - Featured Card */}
+        <div className="mt-8 bg-[var(--color-sage)]/5 border border-[var(--color-sage)]/30 p-8 rounded-2xl">
+          <div className="flex items-center gap-4 max-w-4xl mx-auto">
+            <div className="flex-shrink-0 w-12 h-12 rounded-full bg-[var(--color-sage)]/20 flex items-center justify-center">
+              <AlertCircle size={24} className="text-[var(--color-sage)]" strokeWidth={2} />
+            </div>
+            <div>
+              <h3 className="mb-1 text-[var(--color-earth-dark)] font-semibold">Important Note</h3>
+              <p className="text-[var(--color-stone)]">
+                Class starts on time. Late arrivals may not be allowed to enter the studio to respect the practice of others.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </section>
