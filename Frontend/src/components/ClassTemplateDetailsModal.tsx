@@ -46,11 +46,11 @@ export function ClassTemplateDetailsModal({ templateData, onClose }: ClassTempla
               <ImageCarousel images={templateData.gallery_images} className="w-full h-96" />
             </div>
           ) : templateData.cover_image_url ? (
-            <div className="relative w-full h-64 bg-gradient-to-br from-[var(--color-sage)] to-[var(--color-clay)]">
+            <div className="relative w-full aspect-[4/3] bg-gradient-to-br from-[var(--color-sage)] to-[var(--color-clay)]">
               <img
                 src={templateData.cover_image_url}
                 alt={templateData.title}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover object-center"
                 onError={(e) => {
                   // Fallback to gradient if image fails to load
                   e.currentTarget.style.display = 'none';
@@ -59,7 +59,7 @@ export function ClassTemplateDetailsModal({ templateData, onClose }: ClassTempla
             </div>
           ) : (
             <div 
-              className="relative w-full h-64 flex items-center justify-center"
+              className="relative w-full aspect-[4/3] flex items-center justify-center"
               style={{
                 background: templateData.color_code 
                   ? `linear-gradient(135deg, ${templateData.color_code}, ${templateData.color_code}dd)`

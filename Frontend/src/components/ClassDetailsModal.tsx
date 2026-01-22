@@ -279,7 +279,7 @@ export function ClassDetailsModal({ classData, onClose, onNavigate, onBookingSuc
               <ImageCarousel images={classData.gallery_images} className="w-full h-96" />
             </div>
           ) : (classData.cover_image_url || classData.class_types?.cover_image_url) ? (
-            <div className="relative w-full h-64 bg-gradient-to-br from-[var(--color-sage)] to-[var(--color-clay)]">
+            <div className="relative w-full aspect-[4/3] bg-gradient-to-br from-[var(--color-sage)] to-[var(--color-clay)]">
               <img
                 src={classData.cover_image_url || classData.class_types?.cover_image_url || ''}
                 alt={classData.title}
@@ -290,7 +290,7 @@ export function ClassDetailsModal({ classData, onClose, onNavigate, onBookingSuc
               />
             </div>
           ) : (
-            <div className="relative w-full h-64 bg-gradient-to-br from-[var(--color-sage)] to-[var(--color-clay)] flex items-center justify-center">
+            <div className="relative w-full aspect-[4/3] bg-gradient-to-br from-[var(--color-sage)] to-[var(--color-clay)] flex items-center justify-center">
               <div className="text-center text-white">
                 <h3 className="text-3xl font-bold mb-2">{classData.title}</h3>
                 <p className="text-lg opacity-90">{classData.level}</p>
