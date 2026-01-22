@@ -26,7 +26,7 @@ export function ScheduleGeneratorTab() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [pendingGeneration, setPendingGeneration] = useState<{ month: number; year: number } | null>(null);
+  const [pendingGeneration, setPendingGeneration] = useState<{ startDate: string; endDate: string } | null>(null);
   const [clearingPattern, setClearingPattern] = useState(false);
   const [slotData, setSlotData] = useState({
     classTypeId: '',
@@ -240,8 +240,8 @@ export function ScheduleGeneratorTab() {
     setShowGenerateModal(true);
   };
 
-  const handleGenerateClick = (month: number, year: number) => {
-    setPendingGeneration({ month, year });
+  const handleGenerateClick = (startDate: string, endDate: string) => {
+    setPendingGeneration({ startDate, endDate });
     setShowGenerateModal(false);
     setShowGenerateConfirm(true);
   };
@@ -249,13 +249,13 @@ export function ScheduleGeneratorTab() {
   const handleGenerateConfirm = async () => {
     if (!pendingGeneration) return;
     
-    const { month, year } = pendingGeneration;
+    const { startDate, endDate } = pendingGeneration;
     setShowGenerateConfirm(false);
     setIsGenerating(true);
     
     try {
       console.log('=== Schedule Generation Started ===');
-      console.log('Generating for:', { month, year, weeklySlots });
+      console.log('Generating for:', { startDate, endDate, weeklySlots });
       
       // Check if weeklySlots is empty
       if (!weeklySlots || weeklySlots.length === 0) {
@@ -264,26 +264,27 @@ export function ScheduleGeneratorTab() {
       }
 
       // Client-side schedule generation logic
-      const daysInMonth = new Date(year, month, 0).getDate();
+      const start = new Date(startDate);
+      const end = new Date(endDate);
       const classesToInsert = [];
 
       // Get current user for created_by field
       const { data: authData } = await supabase.auth.getUser();
       const creatorId = authData?.user?.id ?? null;
 
-      console.log('Days in month:', daysInMonth);
+      console.log('Date range:', { start, end });
       console.log('Creator ID:', creatorId);
 
-      // Iterate through all days in the month
-      for (let day = 1; day <= daysInMonth; day++) {
-        const date = new Date(year, month - 1, day);
-        const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+      // Iterate through all days in the date range
+      const currentDate = new Date(start);
+      while (currentDate <= end) {
+        const dayName = currentDate.toLocaleDateString('en-US', { weekday: 'long' });
 
         // Find all slots for this day
         const slotsForDay = weeklySlots.filter(slot => slot.day === dayName);
         
         if (slotsForDay.length > 0) {
-          console.log(`Day ${day} (${dayName}): Found ${slotsForDay.length} slots`);
+          console.log(`${currentDate.toISOString().split('T')[0]} (${dayName}): Found ${slotsForDay.length} slots`);
         }
 
         for (const slot of slotsForDay) {
@@ -323,7 +324,7 @@ export function ScheduleGeneratorTab() {
               }
               
               // Create date object
-              const startsAt = new Date(year, month - 1, day, hours, minutes);
+              const startsAt = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), hours, minutes);
               
               // Validate the date
               if (isNaN(startsAt.getTime())) {
@@ -349,14 +350,14 @@ export function ScheduleGeneratorTab() {
                 instructor_name: slot.instructorName || null,
                 created_by: creatorId
               });
-            } catch (parseError) {
-              console.error(`Failed to parse time for slot: "${slot.time}"`, parseError);
-              continue; // Skip this slot
+            } catch (e) {
+              console.error(`Error processing slot: ${e instanceof Error ? e.message : String(e)}`);
             }
-          } else {
-            console.warn(`  Class type not found for slot with classTypeId: ${slot.classTypeId}`);
           }
         }
+        
+        // Move to next day
+        currentDate.setDate(currentDate.getDate() + 1);
       }
 
       console.log('Total classes to insert:', classesToInsert.length);
@@ -376,7 +377,6 @@ export function ScheduleGeneratorTab() {
         throw error;
       }
 
-      const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long' });
       console.log(`✅ Schedule generated successfully: ${classesToInsert.length} classes created`);
       
       setShowSuccessModal(true);
@@ -438,11 +438,40 @@ export function ScheduleGeneratorTab() {
     return months[month - 1];
   };
 
+  // Convert time string to minutes from midnight for proper sorting
+  const timeToMinutes = (timeStr: string): number => {
+    const trimmed = timeStr.trim();
+    let hours = 0;
+    let minutes = 0;
+    
+    // Check if time contains AM/PM (12-hour format)
+    if (trimmed.includes('AM') || trimmed.includes('PM') || trimmed.includes('am') || trimmed.includes('pm')) {
+      const isPM = trimmed.toUpperCase().includes('PM');
+      const timeOnly = trimmed.replace(/\s*(AM|PM|am|pm)\s*/g, '').trim();
+      const [h, m] = timeOnly.split(':').map(Number);
+      
+      hours = h;
+      minutes = m || 0;
+      
+      // Convert to 24-hour format
+      if (isPM && hours !== 12) {
+        hours += 12;
+      } else if (!isPM && hours === 12) {
+        hours = 0;
+      }
+    } else {
+      // 24-hour format
+      const [h, m] = trimmed.split(':').map(Number);
+      hours = h;
+      minutes = m || 0;
+    }
+    
+    return hours * 60 + minutes;
+  };
+
   const getSlotsByDay = (day: string) => {
     return weeklySlots.filter(slot => slot.day === day).sort((a, b) => {
-      const timeA = a.time.toLowerCase().replace(/\s/g, '');
-      const timeB = b.time.toLowerCase().replace(/\s/g, '');
-      return timeA.localeCompare(timeB);
+      return timeToMinutes(a.time) - timeToMinutes(b.time);
     });
   };
 
@@ -783,7 +812,7 @@ export function ScheduleGeneratorTab() {
                 Confirm Schedule Generation
               </h2>
               <p className="text-[var(--color-stone)] mb-6">
-                Are you sure you want to generate the schedule for <strong>{new Date(pendingGeneration.year, pendingGeneration.month - 1).toLocaleDateString('en-US', { month: 'long' })} {pendingGeneration.year}</strong>? This will create classes based on your weekly pattern.
+                Are you sure you want to generate the schedule from <strong>{new Date(pendingGeneration.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</strong> to <strong>{new Date(pendingGeneration.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</strong>? This will create classes based on your weekly pattern.
               </p>
               <div className="flex items-center justify-end gap-3">
                 <button

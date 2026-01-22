@@ -4,7 +4,9 @@ import { Calendar, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { useClasses } from '../hooks';
 import { ClassDetailsModal } from './ClassDetailsModal';
-import type { Tables } from '../types/database.types';
+import { supabase } from '@/utils/supabase/client';
+import { getDisplayLevel } from '@/constants/levels';
+import type { Tables } from '@/types/database.types';
 
 type DbClass = Tables<'classes'>;
 
@@ -199,10 +201,12 @@ export function WeeklySchedule({ onNavigate, initialClasses }: WeeklySchedulePro
   }
 
   const getLevelColor = (level: string) => {
-    if (level === 'Beginner') return 'bg-[var(--color-sage)]/30 text-[var(--color-clay)]';
-    if (level === 'Intermediate') return 'bg-[var(--color-terracotta)]/30 text-[var(--color-clay)]';
-    if (level === 'Advanced') return 'bg-[var(--color-stone)]/30 text-[var(--color-earth-dark)]';
-    return 'bg-[var(--color-sand)]/50 text-[var(--color-clay)]';
+    const lowerLevel = level.toLowerCase();
+    if (lowerLevel.includes('beginner') || lowerLevel.includes('basic')) return 'bg-teal-100 text-teal-800';
+    if (lowerLevel.includes('intermediate')) return 'bg-orange-100 text-orange-800';
+    if (lowerLevel.includes('advanced')) return 'bg-red-100 text-red-800';
+    // Multilevel/All Levels
+    return 'bg-purple-100 text-purple-800';
   };
 
   // Get current day name
@@ -500,8 +504,8 @@ export function WeeklySchedule({ onNavigate, initialClasses }: WeeklySchedulePro
                       </div>
                       <div className="text-[var(--color-stone)]">{classItem.instructor}</div>
                       <div className="flex items-center">
-                        <span className={`inline-block px-3 py-1 rounded-full text-sm ${getLevelColor(classItem.level)}`}>
-                          {classItem.level}
+                        <span className={`inline-block px-3 py-1 rounded-full text-sm ${getLevelColor(getDisplayLevel(classItem.level))}`}>
+                          {getDisplayLevel(classItem.level)}
                         </span>
                       </div>
                     </button>
@@ -556,8 +560,8 @@ export function WeeklySchedule({ onNavigate, initialClasses }: WeeklySchedulePro
                                 </div>
                                 <div className="text-[var(--color-stone)]">{classItem.instructor}</div>
                                 <div className="flex items-center">
-                                  <span className={`inline-block px-3 py-1 rounded-full text-sm ${getLevelColor(classItem.level)}`}>
-                                    {classItem.level}
+                                  <span className={`inline-block px-3 py-1 rounded-full text-sm ${getLevelColor(getDisplayLevel(classItem.level))}`}>
+                                    {getDisplayLevel(classItem.level)}
                                   </span>
                                 </div>
                               </button>

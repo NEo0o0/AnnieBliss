@@ -4,6 +4,7 @@ import { ArrowRight, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { useClassTypes } from '../hooks';
 import { ClassTemplateDetailsModal } from './ClassTemplateDetailsModal';
+import { getDisplayLevel } from '../constants/levels';
 import type { Tables } from '../types/database.types';
 
 type ClassType = Tables<'class_types'>;
@@ -21,18 +22,19 @@ export function ClassTypes({ onNavigate }: ClassTypesProps) {
   };
 
   const getLevelBadgeColor = (level: string | null) => {
-    if (!level) return 'bg-[var(--color-sand)]';
+    if (!level) return 'bg-gray-100 text-gray-700';
     const lowerLevel = level.toLowerCase();
     if (lowerLevel.includes('beginner') || lowerLevel.includes('basic')) {
-      return 'bg-[var(--color-sage)]/20 text-[var(--color-sage)]';
+      return 'bg-teal-100 text-teal-800';
     }
     if (lowerLevel.includes('intermediate')) {
-      return 'bg-[var(--color-terracotta)]/20 text-[var(--color-terracotta)]';
+      return 'bg-orange-100 text-orange-800';
     }
     if (lowerLevel.includes('advanced')) {
-      return 'bg-[var(--color-clay)]/20 text-[var(--color-clay)]';
+      return 'bg-red-100 text-red-800';
     }
-    return 'bg-[var(--color-sand)]';
+    // Multilevel/All Levels
+    return 'bg-purple-100 text-purple-800';
   };
 
   const formatDuration = (minutes: number | null) => {
@@ -95,8 +97,8 @@ export function ClassTypes({ onNavigate }: ClassTypesProps) {
                   )}
                   {/* Level Badge Overlay */}
                   {classType.level && (
-                    <div className={`absolute top-4 right-4 px-4 py-2 rounded-full shadow-lg ${getLevelBadgeColor(classType.level)}`}>
-                      <span className="font-medium">{classType.level}</span>
+                    <div className={`absolute top-4 right-4 px-4 py-2 rounded-full shadow-lg ${getLevelBadgeColor(getDisplayLevel(classType.level))}`}>
+                      <span className="font-medium">{getDisplayLevel(classType.level)}</span>
                     </div>
                   )}
                 </div>
@@ -117,7 +119,7 @@ export function ClassTypes({ onNavigate }: ClassTypesProps) {
                     {classType.level && (
                       <div className="flex justify-between text-sm">
                         <span className="text-[var(--color-stone)]">Level:</span>
-                        <span className="text-[var(--color-earth-dark)]">{classType.level}</span>
+                        <span className="text-[var(--color-earth-dark)]">{getDisplayLevel(classType.level)}</span>
                       </div>
                     )}
                   </div>

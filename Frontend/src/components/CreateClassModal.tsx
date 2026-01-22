@@ -51,7 +51,7 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
     instructorId: '' as '' | string,
     instructorName: '',
     isGuestInstructor: false,
-    level: 'All Levels',
+    level: 'Multilevel',
     capacity: 12,
     duration: '60 min',
     description: '',
@@ -515,10 +515,10 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
                 required
                 className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
               >
-                <option value="All Levels">All Levels</option>
-                <option value="Beginner">Beginner</option>
-                <option value="Intermediate">Intermediate</option>
-                <option value="Advanced">Advanced</option>
+                <option value="Multilevel">Multilevel</option>
+                <option value="Basic Level">Basic Level</option>
+                <option value="Intermediate Level">Intermediate Level</option>
+                <option value="Advanced Level">Advanced Level</option>
               </select>
             </div>
           </div>

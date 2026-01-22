@@ -57,6 +57,10 @@ export const metadata: Metadata = {
   verification: {
     google: 'Qqa-tSlBBkoEpNN4JA56W6xK_CZ_Koxtkedg7QTaLww',
   },
+  icons: {
+    icon: '/images/logo-white.svg',
+    apple: '/images/logo-white.svg',
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

@@ -1,4 +1,5 @@
 import { X, Clock, DollarSign, TrendingUp } from 'lucide-react';
+import { getDisplayLevel } from '@/constants/levels';
 import { ImageCarousel } from './ImageCarousel';
 
 interface ClassTemplateDetailsModalProps {
@@ -68,7 +69,7 @@ export function ClassTemplateDetailsModal({ templateData, onClose }: ClassTempla
             >
               <div className="text-center text-white">
                 <h3 className="text-3xl font-bold mb-2">{templateData.title}</h3>
-                <p className="text-lg opacity-90">{templateData.level || 'All Levels'}</p>
+                <p className="text-lg opacity-90">{getDisplayLevel(templateData.level)}</p>
               </div>
             </div>
           )}
@@ -86,7 +87,7 @@ export function ClassTemplateDetailsModal({ templateData, onClose }: ClassTempla
                 </span>
               </div>
               <span className="inline-block px-4 py-1 bg-[var(--color-sage)]/10 text-[var(--color-sage)] rounded-full text-sm font-medium">
-                {templateData.level || 'All Levels'}
+                {getDisplayLevel(templateData.level)}
               </span>
             </div>
 

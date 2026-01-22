@@ -6,29 +6,33 @@ import { X, Calendar, Zap } from 'lucide-react';
 interface GenerateScheduleModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onGenerate: (month: number, year: number) => void;
+  onGenerate: (startDate: string, endDate: string) => void;
 }
 
 export function GenerateScheduleModal({ isOpen, onClose, onGenerate }: GenerateScheduleModalProps) {
-  const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth() + 1;
+  // Default to current week
+  const today = new Date();
+  const weekStart = new Date(today);
+  const day = weekStart.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  weekStart.setDate(weekStart.getDate() + diff);
   
-  const [month, setMonth] = useState(currentMonth);
-  const [year, setYear] = useState(currentYear);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+  
+  const [startDate, setStartDate] = useState(weekStart.toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(weekEnd.toISOString().split('T')[0]);
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onGenerate(month, year);
+    if (new Date(startDate) > new Date(endDate)) {
+      alert('Start date must be before end date');
+      return;
+    }
+    onGenerate(startDate, endDate);
   };
-
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-
-  const years = Array.from({ length: 5 }, (_, i) => currentYear + i);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn" onClick={onClose}>
@@ -55,45 +59,35 @@ export function GenerateScheduleModal({ isOpen, onClose, onGenerate }: GenerateS
         {/* Content */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           <p className="text-[var(--color-stone)]">
-            Select the month and year to generate class instances based on your weekly schedule pattern.
+            Select a date range to generate class instances based on your weekly schedule pattern.
           </p>
 
-          {/* Month Selection */}
+          {/* Start Date */}
           <div>
             <label className="block text-sm text-[var(--color-stone)] mb-2">
-              Month *
+              Start Date *
             </label>
-            <select
-              value={month}
-              onChange={(e) => setMonth(parseInt(e.target.value))}
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
               className="w-full px-4 py-3 rounded-lg border border-[var(--color-sand)] focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent transition-all duration-300"
               required
-            >
-              {months.map((monthName, index) => (
-                <option key={index} value={index + 1}>
-                  {monthName}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
-          {/* Year Selection */}
+          {/* End Date */}
           <div>
             <label className="block text-sm text-[var(--color-stone)] mb-2">
-              Year *
+              End Date *
             </label>
-            <select
-              value={year}
-              onChange={(e) => setYear(parseInt(e.target.value))}
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
               className="w-full px-4 py-3 rounded-lg border border-[var(--color-sand)] focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent transition-all duration-300"
               required
-            >
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           {/* Preview */}
@@ -103,7 +97,7 @@ export function GenerateScheduleModal({ isOpen, onClose, onGenerate }: GenerateS
               <span>Schedule Preview:</span>
             </div>
             <p className="text-[var(--color-earth-dark)]">
-              {months[month - 1]} {year}
+              {new Date(startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - {new Date(endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
             </p>
           </div>
 

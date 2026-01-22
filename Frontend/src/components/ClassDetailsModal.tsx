@@ -5,6 +5,7 @@ import { useBookings } from '../hooks/useBookings';
 import { ImageCarousel } from './ImageCarousel';
 import { PaymentMethodSelector } from './PaymentMethodSelector';
 import { sendBookingConfirmationEmail } from '../utils/emailHelpers';
+import { getDisplayLevel } from '@/constants/levels';
 
 interface ClassDetailsModalProps {
   classData: {
@@ -293,7 +294,7 @@ export function ClassDetailsModal({ classData, onClose, onNavigate, onBookingSuc
             <div className="relative w-full aspect-[4/3] bg-gradient-to-br from-[var(--color-sage)] to-[var(--color-clay)] flex items-center justify-center">
               <div className="text-center text-white">
                 <h3 className="text-3xl font-bold mb-2">{classData.title}</h3>
-                <p className="text-lg opacity-90">{classData.level}</p>
+                <p className="text-lg opacity-90">{getDisplayLevel(classData.level)}</p>
               </div>
             </div>
           )}
@@ -306,7 +307,7 @@ export function ClassDetailsModal({ classData, onClose, onNavigate, onBookingSuc
                 {classData.title}
               </h2>
               <span className="inline-block px-4 py-1 bg-[var(--color-sage)]/10 text-[var(--color-sage)] rounded-full text-sm font-medium">
-                {classData.level}
+                {getDisplayLevel(classData.level)}
               </span>
             </div>
 

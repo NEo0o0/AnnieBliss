@@ -39,7 +39,7 @@ export function ClassTypesTab() {
       title: '',
       description: '',
       long_description: '',
-      level: 'All Levels',
+      level: 'Multilevel',
       duration_minutes: 75,
       color_code: '#8CA899',
       default_price: 400.00,
@@ -81,7 +81,7 @@ export function ClassTypesTab() {
       title: classType.title,
       description: classType.description || '',
       long_description: (classType as any).long_description || '',
-      level: classType.level || 'All Levels',
+      level: classType.level || 'Multilevel',
       duration_minutes: classType.duration_minutes || 60,
       color_code: classType.color_code || '#8CA899',
       default_price: classType.default_price || 25.00,
@@ -118,7 +118,7 @@ export function ClassTypesTab() {
     });
   };
 
-  const levelOptions = ['Beginner', 'Intermediate', 'Advanced', 'All Levels'];
+  const levelOptions = ['Basic Level', 'Intermediate Level', 'Advanced Level', 'Multilevel'];
   const colorPresets = [
     { name: 'Sage', value: '#8CA899' },
     { name: 'Clay', value: '#C18A7A' },
