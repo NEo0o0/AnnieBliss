@@ -19,6 +19,7 @@ export function ClassTypesTab() {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    long_description: '',
     level: 'All Levels',
     duration_minutes: 75,
     color_code: '#8CA899', // Default sage color
@@ -37,6 +38,7 @@ export function ClassTypesTab() {
     setFormData({
       title: '',
       description: '',
+      long_description: '',
       level: 'All Levels',
       duration_minutes: 75,
       color_code: '#8CA899',
@@ -78,6 +80,7 @@ export function ClassTypesTab() {
     setFormData({
       title: classType.title,
       description: classType.description || '',
+      long_description: (classType as any).long_description || '',
       level: classType.level || 'All Levels',
       duration_minutes: classType.duration_minutes || 60,
       color_code: classType.color_code || '#8CA899',
@@ -242,7 +245,7 @@ export function ClassTypesTab() {
               {/* Description */}
               <div>
                 <label className="block text-sm text-[var(--color-stone)] mb-2">
-                  Description *
+                  Short Description *
                 </label>
                 <textarea
                   value={formData.description}
@@ -251,6 +254,20 @@ export function ClassTypesTab() {
                   rows={3}
                   placeholder="Brief description of the class"
                   required
+                />
+              </div>
+
+              {/* Long Description */}
+              <div>
+                <label className="block text-sm text-[var(--color-stone)] mb-2">
+                  About this Class <span className="text-[var(--color-stone)]">(Optional)</span>
+                </label>
+                <textarea
+                  value={formData.long_description}
+                  onChange={(e) => setFormData({ ...formData, long_description: e.target.value })}
+                  className="w-full px-4 py-3 rounded-lg border border-[var(--color-sand)] focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent transition-all duration-300 resize-none"
+                  rows={5}
+                  placeholder="Detailed description about the class, benefits, what to expect, etc."
                 />
               </div>
 

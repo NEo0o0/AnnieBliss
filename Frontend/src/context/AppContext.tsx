@@ -18,6 +18,7 @@ interface WeeklySlot {
   day: string; // Monday, Tuesday, etc.
   time: string; // e.g., "09:00 AM"
   instructorId: string;
+  instructorName?: string; // For guest/external instructors
   room: string;
   capacity?: number;
 }

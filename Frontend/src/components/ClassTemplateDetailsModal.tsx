@@ -143,7 +143,7 @@ export function ClassTemplateDetailsModal({ templateData, onClose }: ClassTempla
                 <TrendingUp size={20} className="text-[var(--color-sage)] mt-1 flex-shrink-0" />
                 <div>
                   <h4 className="text-sm font-semibold text-[var(--color-earth-dark)] mb-1">
-                    Class Template
+                    About this Class
                   </h4>
                   <p className="text-sm text-[var(--color-stone)]">
                     This is a class template used for generating recurring classes. 

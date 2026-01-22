@@ -22,11 +22,13 @@ export function ScheduleGeneratorTab() {
   const [instructors, setInstructors] = useState<{ id: string; name: string }[]>([]);
   const [loadingInstructors, setLoadingInstructors] = useState(false);
   const [submittingSlot, setSubmittingSlot] = useState(false);
+  const [isGuestInstructor, setIsGuestInstructor] = useState(false);
   const [slotData, setSlotData] = useState({
     classTypeId: '',
     day: '',
     time: '09:00',
     instructorId: '',
+    instructorName: '',
     room: '',
     capacity: 20
   });
@@ -75,7 +77,7 @@ export function ScheduleGeneratorTab() {
     slotData.classTypeId &&
     slotData.day &&
     slotData.time &&
-    slotData.instructorId &&
+    (isGuestInstructor ? slotData.instructorName.trim() : slotData.instructorId) &&
     slotData.room &&
     slotData.capacity > 0
   );
@@ -108,9 +110,14 @@ export function ScheduleGeneratorTab() {
       toast.error('Please select a time');
       return;
     }
-    if (!slotData.instructorId) {
+    if (!isGuestInstructor && !slotData.instructorId) {
       console.error('Missing instructorId');
       toast.error('Please select an instructor');
+      return;
+    }
+    if (isGuestInstructor && !slotData.instructorName.trim()) {
+      console.error('Missing instructor name');
+      toast.error('Please enter instructor name');
       return;
     }
     if (!slotData.room) {
@@ -138,7 +145,8 @@ export function ScheduleGeneratorTab() {
         classTypeId: slotData.classTypeId,
         day: slotData.day,
         time: timeFormatted,
-        instructorId: slotData.instructorId,
+        instructorId: isGuestInstructor ? '' : slotData.instructorId,
+        instructorName: isGuestInstructor ? slotData.instructorName.trim() : '',
         room: slotData.room,
         capacity: slotData.capacity
       };
@@ -153,9 +161,11 @@ export function ScheduleGeneratorTab() {
         day: '',
         time: '09:00',
         instructorId: '',
+        instructorName: '',
         room: '',
         capacity: 20
       });
+      setIsGuestInstructor(false);
       
       toast.success('Weekly slot added successfully!');
       setShowAddSlot(false);
@@ -291,7 +301,8 @@ export function ScheduleGeneratorTab() {
                 ends_at: endsAt.toISOString(),
                 category: 'class',
                 location: slot.room,
-                instructor_id: slot.instructorId,
+                instructor_id: slot.instructorId || null,
+                instructor_name: slot.instructorName || null,
                 created_by: creatorId
               });
             } catch (parseError) {
@@ -573,16 +584,59 @@ export function ScheduleGeneratorTab() {
                 <label className="block text-sm text-[var(--color-stone)] mb-2">
                   Instructor *
                 </label>
-                <select
-                  value={slotData.instructorId}
-                  onChange={(e) => setSlotData({ ...slotData, instructorId: e.target.value })}
-                  className="w-full px-4 py-3 rounded-lg border border-[var(--color-sand)] focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent transition-all duration-300"
-                >
-                  <option value="">Select an instructor...</option>
-                  {instructors.map(instructor => (
-                    <option key={instructor.id} value={instructor.id}>{instructor.name}</option>
-                  ))}
-                </select>
+                
+                {/* Guest/Registered Toggle */}
+                <div className="flex gap-2 p-1 bg-[var(--color-cream)] rounded-lg mb-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsGuestInstructor(false);
+                      setSlotData({ ...slotData, instructorName: '' });
+                    }}
+                    className={`flex-1 px-3 py-2 rounded-md text-sm transition-all duration-200 ${
+                      !isGuestInstructor
+                        ? 'bg-white text-[var(--color-earth-dark)] shadow-sm'
+                        : 'text-[var(--color-stone)] hover:text-[var(--color-earth-dark)]'
+                    }`}
+                  >
+                    Registered
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsGuestInstructor(true);
+                      setSlotData({ ...slotData, instructorId: '' });
+                    }}
+                    className={`flex-1 px-3 py-2 rounded-md text-sm transition-all duration-200 ${
+                      isGuestInstructor
+                        ? 'bg-white text-[var(--color-earth-dark)] shadow-sm'
+                        : 'text-[var(--color-stone)] hover:text-[var(--color-earth-dark)]'
+                    }`}
+                  >
+                    Guest / External
+                  </button>
+                </div>
+
+                {isGuestInstructor ? (
+                  <input
+                    type="text"
+                    value={slotData.instructorName}
+                    onChange={(e) => setSlotData({ ...slotData, instructorName: e.target.value })}
+                    placeholder="Enter instructor name (e.g., Master Kim)"
+                    className="w-full px-4 py-3 rounded-lg border border-[var(--color-sand)] focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent transition-all duration-300"
+                  />
+                ) : (
+                  <select
+                    value={slotData.instructorId}
+                    onChange={(e) => setSlotData({ ...slotData, instructorId: e.target.value })}
+                    className="w-full px-4 py-3 rounded-lg border border-[var(--color-sand)] focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent transition-all duration-300"
+                  >
+                    <option value="">Select an instructor...</option>
+                    {instructors.map(instructor => (
+                      <option key={instructor.id} value={instructor.id}>{instructor.name}</option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               {/* Room */}
