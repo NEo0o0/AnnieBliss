@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { unstable_cache } from 'next/cache';
 import { createSupabasePublicClient } from '@/utils/supabase/public';
 
-export const revalidate = 30;
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 function toIsoOrNull(value: string | null): string | null {
   if (!value) return null;
@@ -84,28 +84,14 @@ export async function GET(req: Request) {
   const classTypeIdRaw = url.searchParams.get('classTypeId');
   const classTypeId = classTypeIdRaw ? Number(classTypeIdRaw) : null;
 
-  const cacheKey = [
-    'api/classes',
-    start ?? '',
-    end ?? '',
-    category ?? '',
-    classTypeIdRaw ?? '',
-  ];
-
   try {
-    const cached = unstable_cache(
-      () =>
-        fetchClassesFromDb({
-          start,
-          end,
-          category,
-          classTypeId: Number.isFinite(classTypeId) ? classTypeId : null,
-        }),
-      cacheKey,
-      { revalidate }
-    );
+    const data = await fetchClassesFromDb({
+      start,
+      end,
+      category,
+      classTypeId: Number.isFinite(classTypeId) ? classTypeId : null,
+    });
 
-    const data = await cached();
     return NextResponse.json({ data });
   } catch (err: any) {
     console.error('[API /api/classes] GET failed', err);

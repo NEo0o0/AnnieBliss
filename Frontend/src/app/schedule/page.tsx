@@ -2,7 +2,8 @@ import { ScheduleClient } from './ScheduleClient';
 import { createSupabaseServerClient } from '@/utils/supabase/server';
 import type { Tables } from '@/types/database.types';
 
-export const revalidate = 30;
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 type DbClass = Tables<'classes'>;
 

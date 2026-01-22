@@ -23,6 +23,11 @@ export function ScheduleGeneratorTab() {
   const [loadingInstructors, setLoadingInstructors] = useState(false);
   const [submittingSlot, setSubmittingSlot] = useState(false);
   const [isGuestInstructor, setIsGuestInstructor] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [pendingGeneration, setPendingGeneration] = useState<{ month: number; year: number } | null>(null);
+  const [clearingPattern, setClearingPattern] = useState(false);
   const [slotData, setSlotData] = useState({
     classTypeId: '',
     day: '',
@@ -30,7 +35,7 @@ export function ScheduleGeneratorTab() {
     instructorId: '',
     instructorName: '',
     room: '',
-    capacity: 20
+    capacity: 12
   });
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -163,7 +168,7 @@ export function ScheduleGeneratorTab() {
         instructorId: '',
         instructorName: '',
         room: '',
-        capacity: 20
+        capacity: 12
       });
       setIsGuestInstructor(false);
       
@@ -195,7 +200,34 @@ export function ScheduleGeneratorTab() {
       message: `Are you sure you want to delete the ${slotName} slot? This will not affect already generated classes.`,
       onConfirm: () => {
         deleteWeeklySlot(slotId);
-        toast.success('Weekly slot deleted successfully');
+        toast.success('Slot removed successfully');
+      }
+    });
+  };
+
+  const handleClearPattern = () => {
+    if (weeklySlots.length === 0) {
+      toast.error('No slots to clear');
+      return;
+    }
+
+    setConfirmModal({
+      isOpen: true,
+      title: 'Clear Weekly Pattern',
+      message: `Are you sure you want to remove ALL ${weeklySlots.length} slots from your weekly planner? This cannot be undone.`,
+      onConfirm: async () => {
+        setClearingPattern(true);
+        try {
+          // Delete all slots one by one
+          for (const slot of weeklySlots) {
+            deleteWeeklySlot(slot.id);
+          }
+          toast.success('Weekly pattern cleared successfully');
+        } catch (error) {
+          toast.error('Failed to clear pattern');
+        } finally {
+          setClearingPattern(false);
+        }
       }
     });
   };
@@ -208,7 +240,19 @@ export function ScheduleGeneratorTab() {
     setShowGenerateModal(true);
   };
 
-  const handleGenerateConfirm = async (month: number, year: number) => {
+  const handleGenerateClick = (month: number, year: number) => {
+    setPendingGeneration({ month, year });
+    setShowGenerateModal(false);
+    setShowGenerateConfirm(true);
+  };
+
+  const handleGenerateConfirm = async () => {
+    if (!pendingGeneration) return;
+    
+    const { month, year } = pendingGeneration;
+    setShowGenerateConfirm(false);
+    setIsGenerating(true);
+    
     try {
       console.log('=== Schedule Generation Started ===');
       console.log('Generating for:', { month, year, weeklySlots });
@@ -294,7 +338,7 @@ export function ScheduleGeneratorTab() {
                 title: classType.title,
                 description: classType.description,
                 level: classType.level ?? 'All Levels',
-                capacity: slot.capacity ?? 20,
+                capacity: slot.capacity ?? 12,
                 class_type_id: classType.id,
                 price: classType.default_price ?? null,
                 starts_at: startsAt.toISOString(),
@@ -334,12 +378,16 @@ export function ScheduleGeneratorTab() {
 
       const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long' });
       console.log(`✅ Schedule generated successfully: ${classesToInsert.length} classes created`);
-      toast.success(`Schedule generated for ${monthName} ${year}! Created ${classesToInsert.length} classes.`, { duration: 4000 });
-      setShowGenerateModal(false);
+      
+      setShowSuccessModal(true);
+      setPendingGeneration(null);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       console.error('Schedule generation error:', e);
       toast.error(`Failed to generate schedule: ${message}`);
+      setPendingGeneration(null);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -364,7 +412,7 @@ export function ScheduleGeneratorTab() {
             time: slot.time,
             instructor: instructor.name,
             level: classType.level || 'All Levels',
-            capacity: 20,
+            capacity: slot.capacity ?? 12,
             enrolled: 0,
             day: dayName,
             duration: `${classType.duration_minutes || 60} min`,
@@ -420,6 +468,23 @@ export function ScheduleGeneratorTab() {
         </div>
         <div className="flex gap-3">
           <button
+            onClick={handleClearPattern}
+            disabled={weeklySlots.length === 0 || clearingPattern}
+            className="border-2 border-red-500 text-red-600 hover:bg-red-50 px-6 py-3 rounded-lg flex items-center gap-2 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {clearingPattern ? (
+              <>
+                <Loader2 size={20} className="animate-spin" />
+                <span>Clearing...</span>
+              </>
+            ) : (
+              <>
+                <Trash2 size={20} />
+                <span>Clear Pattern</span>
+              </>
+            )}
+          </button>
+          <button
             onClick={() => setShowAddSlot(true)}
             className="bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg"
           >
@@ -428,7 +493,7 @@ export function ScheduleGeneratorTab() {
           </button>
           <button
             onClick={handleGenerateSchedule}
-            disabled={weeklySlots.length === 0}
+            disabled={weeklySlots.length === 0 || isGenerating}
             className="bg-[var(--color-clay)] hover:bg-[var(--color-earth-dark)] text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Zap size={20} />
@@ -706,10 +771,82 @@ export function ScheduleGeneratorTab() {
       <GenerateScheduleModal
         isOpen={showGenerateModal}
         onClose={() => setShowGenerateModal(false)}
-        onGenerate={handleGenerateConfirm}
+        onGenerate={handleGenerateClick}
       />
 
-      {/* Confirmation Modal */}
+      {/* Generate Confirmation Modal */}
+      {showGenerateConfirm && pendingGeneration && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn" onClick={() => setShowGenerateConfirm(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full animate-scaleIn" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6">
+              <h2 className="text-2xl font-bold text-[var(--color-earth-dark)] mb-4">
+                Confirm Schedule Generation
+              </h2>
+              <p className="text-[var(--color-stone)] mb-6">
+                Are you sure you want to generate the schedule for <strong>{new Date(pendingGeneration.year, pendingGeneration.month - 1).toLocaleDateString('en-US', { month: 'long' })} {pendingGeneration.year}</strong>? This will create classes based on your weekly pattern.
+              </p>
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowGenerateConfirm(false);
+                    setPendingGeneration(null);
+                  }}
+                  className="px-6 py-3 rounded-lg text-[var(--color-stone)] hover:bg-[var(--color-cream)] transition-colors duration-300"
+                  disabled={isGenerating}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleGenerateConfirm}
+                  disabled={isGenerating}
+                  className="bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 size={20} className="animate-spin" />
+                      <span>Generating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Zap size={20} />
+                      <span>Confirm Generate</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn" onClick={() => setShowSuccessModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full animate-scaleIn" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 rounded-full bg-green-100 mx-auto mb-4 flex items-center justify-center">
+                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-[var(--color-earth-dark)] mb-4">
+                Success!
+              </h2>
+              <p className="text-[var(--color-stone)] mb-6">
+                Schedule has been generated successfully.
+              </p>
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                className="bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white px-8 py-3 rounded-lg transition-all duration-300 shadow-md hover:shadow-lg"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
       <ConfirmationModal
         isOpen={confirmModal.isOpen}
         onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}

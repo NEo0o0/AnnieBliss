@@ -52,7 +52,7 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
     instructorName: '',
     isGuestInstructor: false,
     level: 'All Levels',
-    capacity: 20,
+    capacity: 12,
     duration: '60 min',
     description: '',
     long_description: '',

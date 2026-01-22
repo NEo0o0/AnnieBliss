@@ -21,7 +21,6 @@ export function GenerateScheduleModal({ isOpen, onClose, onGenerate }: GenerateS
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onGenerate(month, year);
-    onClose();
   };
 
   const months = [
