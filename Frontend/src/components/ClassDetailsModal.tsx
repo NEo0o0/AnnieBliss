@@ -699,12 +699,23 @@ export function ClassDetailsModal({ classData, onClose, onNavigate, onBookingSuc
                   </button>
                 )
               ) : (
-                <button
-                  onClick={handleLoginRedirect}
-                  className="w-full py-4 bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white rounded-lg font-medium transition-all duration-300 shadow-md hover:shadow-lg"
-                >
-                  Login to Book
-                </button>
+                <>
+                  <button
+                    onClick={handleLoginRedirect}
+                    className="w-full py-4 bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white rounded-lg font-medium transition-all duration-300 shadow-md hover:shadow-lg"
+                  >
+                    Login to Book
+                  </button>
+                  <a
+                    href={`https://wa.me/66649249666?text=Hi, I would like to book a class: ${encodeURIComponent(classData.title)} on ${encodeURIComponent(classData.day)} at ${encodeURIComponent(classData.time)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-4 border-2 border-[var(--color-sage)] text-[var(--color-sage)] rounded-lg font-medium transition-all duration-300 hover:bg-[var(--color-sage)]/10 flex items-center justify-center gap-2"
+                  >
+                    <span>📱</span>
+                    <span>Manual Book via WhatsApp</span>
+                  </a>
+                </>
               )}
               <button
                 onClick={onClose}

@@ -504,15 +504,15 @@ export function EventDetailModal({ event, onClose, onNavigate }: EventDetailModa
                     >
                       <span className="text-lg">Login to Register</span>
                     </button>
-                    <p className="text-center text-[var(--color-stone)] text-sm">
-                      Or{' '}
-                      <button
-                        onClick={handleContactRedirect}
-                        className="text-[var(--color-sage)] hover:text-[var(--color-clay)] underline transition-colors duration-300"
-                      >
-                        contact us to book manually
-                      </button>
-                    </p>
+                    <a
+                      href={`https://wa.me/66649249666?text=Hi, I would like to register for: ${encodeURIComponent(event.title)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-4 border-2 border-[var(--color-sage)] text-[var(--color-sage)] rounded-lg font-medium transition-all duration-300 hover:bg-[var(--color-sage)]/10 flex items-center justify-center gap-2"
+                    >
+                      <span>📱</span>
+                      <span>Manual Book via WhatsApp</span>
+                    </a>
                   </>
                 ) : null}
 
