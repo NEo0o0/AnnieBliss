@@ -18,6 +18,7 @@ interface EventDetailModalProps {
     price: string;
     location: string;
     excerpt: string;
+    long_description?: string | null;
     category: string;
     gallery_images?: string[] | null;
     early_bird_price?: number | null;
@@ -272,12 +273,19 @@ export function EventDetailModal({ event, onClose, onNavigate }: EventDetailModa
           </div>
 
           {/* Description */}
-          {event.excerpt && (
+          {(event.excerpt || event.long_description) && (
             <div>
               <h3 className="text-lg font-semibold text-[var(--color-earth-dark)] mb-3">About This Event</h3>
-              <p className="text-[var(--color-stone)] leading-relaxed">
-                {event.excerpt}
-              </p>
+              {event.excerpt && (
+                <p className="text-[var(--color-stone)] leading-relaxed mb-4">
+                  {event.excerpt}
+                </p>
+              )}
+              {event.long_description && (
+                <div className="text-[var(--color-stone)] leading-relaxed whitespace-pre-wrap">
+                  {event.long_description}
+                </div>
+              )}
             </div>
           )}
 

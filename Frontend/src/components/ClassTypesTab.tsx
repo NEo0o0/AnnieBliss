@@ -213,7 +213,7 @@ export function ClassTypesTab() {
       {/* Create/Edit Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={resetForm}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-6 border-b border-[var(--color-sand)]">
               <h2 className="text-2xl text-[var(--color-earth-dark)]">
                 {editingId ? 'Edit Class Type' : 'Create New Class Type'}

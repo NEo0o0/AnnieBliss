@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { X, Save, Loader2, Image as ImageIcon } from 'lucide-react';
+import { X, Save, Loader2, Image as ImageIcon, Star } from 'lucide-react';
 import { supabase } from '@/utils/supabase/client';
 import { MultiImageUpload } from './MultiImageUpload';
 import { toast } from 'sonner';
@@ -10,6 +10,7 @@ interface GalleryManagementModalProps {
   workshopId: number;
   workshopTitle: string;
   currentGalleryImages: string[] | null;
+  currentCoverImage?: string | null;
   onClose: () => void;
   onSuccess?: () => void;
 }
@@ -18,11 +19,31 @@ export function GalleryManagementModal({
   workshopId, 
   workshopTitle, 
   currentGalleryImages,
+  currentCoverImage,
   onClose,
   onSuccess 
 }: GalleryManagementModalProps) {
   const [galleryImages, setGalleryImages] = useState<string[]>(currentGalleryImages || []);
+  const [coverImage, setCoverImage] = useState<string | null>(currentCoverImage || null);
   const [saving, setSaving] = useState(false);
+
+  const handleSetAsCover = async (imageUrl: string) => {
+    try {
+      const { error } = await supabase
+        .from('classes')
+        .update({ cover_image_url: imageUrl })
+        .eq('id', workshopId);
+
+      if (error) throw error;
+
+      setCoverImage(imageUrl);
+      toast.success('Cover image updated!');
+      if (onSuccess) onSuccess();
+    } catch (error: any) {
+      console.error('Error updating cover image:', error);
+      toast.error(error.message || 'Failed to update cover image');
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -76,6 +97,41 @@ export function GalleryManagementModal({
               These images will be displayed in a slideshow on the workshop details page.
             </p>
           </div>
+
+          {/* Gallery Images Grid */}
+          {galleryImages.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+              {galleryImages.map((imageUrl, index) => (
+                <div key={index} className="relative group">
+                  <img
+                    src={imageUrl}
+                    alt={`Gallery image ${index + 1}`}
+                    className="w-full h-40 object-cover rounded-lg"
+                  />
+                  {/* Set as Cover Button */}
+                  <button
+                    onClick={() => handleSetAsCover(imageUrl)}
+                    className={`absolute top-2 right-2 p-2 rounded-full shadow-lg transition-all duration-200 ${
+                      coverImage === imageUrl
+                        ? 'bg-yellow-500 text-white'
+                        : 'bg-white/90 hover:bg-white text-[var(--color-sage)] hover:text-[var(--color-clay)]'
+                    }`}
+                    title={coverImage === imageUrl ? 'Current cover image' : 'Set as cover image'}
+                  >
+                    <Star size={16} fill={coverImage === imageUrl ? 'currentColor' : 'none'} />
+                  </button>
+                  {/* Remove Button */}
+                  <button
+                    onClick={() => setGalleryImages(galleryImages.filter((_, i) => i !== index))}
+                    className="absolute top-2 left-2 p-2 bg-red-500/90 hover:bg-red-600 text-white rounded-full shadow-lg transition-all duration-200 opacity-0 group-hover:opacity-100"
+                    title="Remove image"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
           <MultiImageUpload
             images={galleryImages}

@@ -80,6 +80,7 @@ const formatEvent = (workshop: Workshop) => {
     price: formatPrice(workshop.price),
     location: workshop.location || 'TBA',
     excerpt: workshop.description || '',
+    long_description: workshop.long_description,
     category: workshop.category || 'Workshop',
     gallery_images: workshop.gallery_images,
     early_bird_price: workshop.early_bird_price,
@@ -409,6 +410,7 @@ export function WorkshopsEvents({ initialWorkshops }: { initialWorkshops?: Works
           workshopId={editingGallery.id}
           workshopTitle={editingGallery.title}
           currentGalleryImages={editingGallery.gallery_images}
+          currentCoverImage={editingGallery.cover_image_url}
           onClose={() => setEditingGallery(null)}
           onSuccess={() => {
             refetch();

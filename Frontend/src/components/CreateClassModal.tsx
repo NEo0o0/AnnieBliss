@@ -3,6 +3,7 @@
 import { X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/utils/supabase/client';
+import { toast } from 'sonner';
 import { ImageUpload } from './ImageUpload';
 import { MultiImageUpload } from './MultiImageUpload';
 import type { Tables, TablesInsert } from '@/types/database.types';
@@ -250,6 +251,7 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
       const { error } = await supabase.from('classes').insert(insertPayload);
       if (error) throw error;
 
+      toast.success('Class/Event created successfully!');
       onClose();
       onCreated?.();
     } catch (err) {
