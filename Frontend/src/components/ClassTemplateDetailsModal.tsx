@@ -116,9 +116,6 @@ export function ClassTemplateDetailsModal({ templateData, onClose }: ClassTempla
             {/* Description */}
             {templateData.description && (
               <div className="mb-6">
-                <h3 className="text-lg font-semibold text-[var(--color-earth-dark)] mb-3">
-                  About This Class Type
-                </h3>
                 <p className="text-[var(--color-stone)] leading-relaxed">
                   {templateData.description}
                 </p>
