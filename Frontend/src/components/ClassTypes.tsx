@@ -44,7 +44,7 @@ export function ClassTypes({ onNavigate }: ClassTypesProps) {
     <section className="py-20 px-6 bg-[var(--color-cream)]">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="mb-4 text-[var(--color-earth-dark)]">Class Types</h2>
+          <h2 className="mb-4 text-[var(--color-earth-dark)]">Classes</h2>
           <p className="text-[var(--color-stone)] max-w-2xl mx-auto">
             Choose the right class for your experience level and personal goals.
           </p>
@@ -54,14 +54,14 @@ export function ClassTypes({ onNavigate }: ClassTypesProps) {
         {loading && (
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 size={48} className="text-[var(--color-sage)] animate-spin mb-4" />
-            <p className="text-[var(--color-stone)]">Loading class types...</p>
+            <p className="text-[var(--color-stone)]">Loading classes...</p>
           </div>
         )}
 
         {/* Error State */}
         {error && !loading && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center max-w-md mx-auto">
-            <p className="text-red-800">Failed to load class types. Please try again later.</p>
+            <p className="text-red-800">Failed to load classes. Please try again later.</p>
           </div>
         )}
 
@@ -141,10 +141,10 @@ export function ClassTypes({ onNavigate }: ClassTypesProps) {
           <div className="text-center py-20">
             <div className="text-6xl mb-4">🧘</div>
             <h3 className="mb-2 text-[var(--color-earth-dark)]">
-              No Class Types Available
+              No Classes Available
             </h3>
             <p className="text-[var(--color-stone)]">
-              Check back soon for our class types!
+              Check back soon for our classes!
             </p>
           </div>
         )}

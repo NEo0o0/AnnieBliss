@@ -125,33 +125,17 @@ export function ClassTemplateDetailsModal({ templateData, onClose }: ClassTempla
               </div>
             )}
 
-            {/* Long Description (if available) */}
+            {/* About this Class - Long Description (if available) */}
             {templateData.long_description && (
               <div className="mb-6">
                 <h3 className="text-lg font-semibold text-[var(--color-earth-dark)] mb-3">
-                  What to Expect
+                  About this Class
                 </h3>
                 <div className="text-[var(--color-stone)] leading-relaxed whitespace-pre-line">
                   {templateData.long_description}
                 </div>
               </div>
             )}
-
-            {/* Info Box */}
-            <div className="p-4 bg-[var(--color-sage)]/5 border border-[var(--color-sage)]/20 rounded-lg">
-              <div className="flex items-start gap-3">
-                <TrendingUp size={20} className="text-[var(--color-sage)] mt-1 flex-shrink-0" />
-                <div>
-                  <h4 className="text-sm font-semibold text-[var(--color-earth-dark)] mb-1">
-                    About this Class
-                  </h4>
-                  <p className="text-sm text-[var(--color-stone)]">
-                    This is a class template used for generating recurring classes. 
-                    Actual class times, instructors, and availability will vary based on the schedule.
-                  </p>
-                </div>
-              </div>
-            </div>
 
             {/* Close Button */}
             <div className="mt-6">

@@ -162,7 +162,7 @@ export function Pricing({ isAuthenticated, initialPackages }: PricingProps) {
           )}
           <div className="flex items-center gap-3 text-[var(--color-stone)]">
             <Check size={20} className="text-[var(--color-sage)] flex-shrink-0" />
-            <span>All class types included</span>
+            <span>All classes included</span>
           </div>
           <div className="flex items-center gap-3 text-[var(--color-stone)]">
             <Check size={20} className="text-[var(--color-sage)] flex-shrink-0" />
