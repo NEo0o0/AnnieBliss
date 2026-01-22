@@ -75,6 +75,7 @@ export function AdminBookingModal({
   const [guestName, setGuestName] = useState('');
   const [guestContact, setGuestContact] = useState('');
   const [guestHealthCondition, setGuestHealthCondition] = useState('');
+  const [guestNationality, setGuestNationality] = useState('');
   const [guestAvatarUrl, setGuestAvatarUrl] = useState('');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
@@ -126,6 +127,7 @@ export function AdminBookingModal({
     setGuestName('');
     setGuestContact('');
     setGuestHealthCondition('');
+    setGuestNationality('');
     setGuestAvatarUrl('');
     setBookingType('package');
     setAmountDue(defaultAmountDue ?? 0);
@@ -257,6 +259,7 @@ export function AdminBookingModal({
             guest_name: guestName.trim(),
             guest_contact: guestContact.trim() || null,
             guest_health_condition: guestHealthCondition.trim() || null,
+            guest_nationality: guestNationality.trim() || null,
             guest_avatar_url: guestAvatarUrl || null,
             status: 'booked',
             kind: 'dropin',
@@ -598,6 +601,34 @@ export function AdminBookingModal({
                       placeholder="Phone or email"
                       className="w-full px-4 py-3 rounded-lg border border-[var(--color-sand)] focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-[var(--color-earth-dark)] mb-1">
+                      Nationality <span className="text-[var(--color-stone)]">(Optional)</span>
+                    </label>
+                    <select
+                      value={guestNationality}
+                      onChange={(e) => setGuestNationality(e.target.value)}
+                      className="w-full px-4 py-3 rounded-lg border border-[var(--color-sand)] focus:ring-2 focus:ring-[var(--color-sage)] focus:border-transparent"
+                    >
+                      <option value="">Select nationality</option>
+                      <option value="Thai">Thai</option>
+                      <option value="Chinese">Chinese</option>
+                      <option value="Russian">Russian</option>
+                      <option value="American">American</option>
+                      <option value="British">British</option>
+                      <option value="Australian">Australian</option>
+                      <option value="Japanese">Japanese</option>
+                      <option value="Korean">Korean</option>
+                      <option value="German">German</option>
+                      <option value="French">French</option>
+                      <option value="Indian">Indian</option>
+                      <option value="Canadian">Canadian</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    <p className="text-xs text-[var(--color-stone)] mt-1">
+                      Helps with reporting and analytics
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm text-[var(--color-earth-dark)] mb-1">

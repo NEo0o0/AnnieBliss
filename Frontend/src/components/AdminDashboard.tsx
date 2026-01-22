@@ -34,6 +34,7 @@ import { AdminBookingModal } from './AdminBookingModal';
 import { ConfirmationModal } from './ConfirmationModal';
 import { VerifySlipsSection } from './VerifySlipsSection';
 import { SiteSettings } from './Admin/SiteSettings';
+import { ManualTransactionModal } from './ManualTransactionModal';
 import { toast } from 'sonner';
 import { useDashboardStats } from '../hooks/useDashboardStats';
 import { supabase } from '@/utils/supabase/client';
@@ -96,6 +97,8 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
   const [showCheckinModal, setShowCheckinModal] = useState(false);
   const [checkinClassId, setCheckinClassId] = useState<number | null>(null);
   const [checkinSaving, setCheckinSaving] = useState(false);
+
+  const [showManualPaymentModal, setShowManualPaymentModal] = useState(false);
 
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -1016,7 +1019,10 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
                       </button>
 
                       {/* Record Payment Button */}
-                      <button className="w-full bg-[var(--color-earth-dark)] hover:bg-[var(--color-clay)] text-white px-4 md:px-6 py-3 md:py-4 rounded-lg transition-all duration-300 shadow-md hover:shadow-lg flex items-center justify-center gap-3 group">
+                      <button 
+                        onClick={() => setShowManualPaymentModal(true)}
+                        className="w-full bg-[var(--color-earth-dark)] hover:bg-[var(--color-clay)] text-white px-4 md:px-6 py-3 md:py-4 rounded-lg transition-all duration-300 shadow-md hover:shadow-lg flex items-center justify-center gap-3 group"
+                      >
                         <CreditCard size={20} className="group-hover:scale-110 transition-transform duration-300" />
                         <span className="text-sm md:text-base">Record Payment</span>
                       </button>
@@ -1230,6 +1236,19 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
                 return { ...c, booked: Number(c.booked ?? 0) + 1 };
               })
             );
+          }}
+        />
+      )}
+      
+      {/* Manual Payment/Transaction Modal */}
+      {showManualPaymentModal && (
+        <ManualTransactionModal
+          isOpen={showManualPaymentModal}
+          onClose={() => setShowManualPaymentModal(false)}
+          onSuccess={() => {
+            setShowManualPaymentModal(false);
+            refetchStats();
+            toast.success('Payment recorded successfully!');
           }}
         />
       )}

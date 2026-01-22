@@ -20,9 +20,9 @@ export function ClassTypesTab() {
     title: '',
     description: '',
     level: 'All Levels',
-    duration_minutes: 60,
+    duration_minutes: 75,
     color_code: '#8CA899', // Default sage color
-    default_price: 25.00,
+    default_price: 400.00,
     cover_image_url: '',
     gallery_images: [] as string[]
   });
@@ -38,9 +38,9 @@ export function ClassTypesTab() {
       title: '',
       description: '',
       level: 'All Levels',
-      duration_minutes: 60,
+      duration_minutes: 75,
       color_code: '#8CA899',
-      default_price: 25.00,
+      default_price: 400.00,
       cover_image_url: '',
       gallery_images: [] as string[]
     });

@@ -182,8 +182,9 @@ export function PaymentMethodSelector({
     );
   }
 
-  // If contact admin only mode, show contact options
-  if (showContactAdminOnly) {
+  // If contact admin only mode AND not a class booking, show contact options only
+  // For class bookings, we still want to show the Cash option even in contact_admin mode
+  if (showContactAdminOnly && inferredProductType !== 'class_booking') {
     return (
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-[var(--color-earth-dark)]">
@@ -425,8 +426,8 @@ export function PaymentMethodSelector({
         </button>
       )}
 
-      {/* WhatsApp Contact - Workshops & Bundles (only if contact_admin is enabled or no other options) */}
-      {(isWorkshop || isBundle) && paymentConfig.contact_admin && (
+      {/* WhatsApp Contact - Show for all product types when contact_admin is enabled */}
+      {paymentConfig.contact_admin && (
         <button
           onClick={handleManualPaymentClick}
           className="w-full p-4 rounded-lg border-2 border-green-500 hover:border-green-600 bg-green-50 hover:bg-green-100 transition-all duration-300 text-left"
