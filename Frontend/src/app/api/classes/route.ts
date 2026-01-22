@@ -30,15 +30,17 @@ async function fetchClassesFromDb(params: {
   let query = supabase
     .from('classes')
     .select('*, class_types!left(*)')
+    .eq('is_cancelled', false) // Filter cancelled classes at DB level
     .order('starts_at', { ascending: true });
 
-  // For date range, use < instead of <= for end to cover full 24 hours
-  if (params.start) query = query.gte('starts_at', params.start);
+  // STRICT date range filtering: starts_at >= start AND starts_at <= end
+  // Frontend sends end date with 23:59:59.999, so use <= (not <)
+  // Do NOT add days or modify the date strings - use them as-is
+  if (params.start) {
+    query = query.gte('starts_at', params.start);
+  }
   if (params.end) {
-    // Extend end date to cover the entire day (add 1 day and use < instead of <=)
-    const endDate = new Date(params.end);
-    endDate.setDate(endDate.getDate() + 1);
-    query = query.lt('starts_at', endDate.toISOString());
+    query = query.lte('starts_at', params.end);
   }
   
   // Case-insensitive category filter
@@ -50,29 +52,27 @@ async function fetchClassesFromDb(params: {
 
   const { data, error } = await query;
   
-  console.log('[fetchClassesFromDb] Query result:', {
-    count: data?.length ?? 0,
-    error: error?.message,
-    firstClass: data?.[0] ? {
-      id: data[0].id,
-      title: data[0].title,
-      starts_at: data[0].starts_at,
-      category: data[0].category,
-      is_cancelled: data[0].is_cancelled
-    } : null
-  });
-  
   if (error) throw error;
   
-  // Filter out cancelled classes in JS to ensure we see all data first
-  const filtered = data?.filter(c => !c.is_cancelled) ?? [];
-  
-  console.log('[fetchClassesFromDb] After filtering cancelled:', {
-    originalCount: data?.length ?? 0,
-    filteredCount: filtered.length
+  // Comprehensive debug logging: Show ALL returned classes
+  console.log('[fetchClassesFromDb] Query result:', {
+    count: data?.length ?? 0,
+    requestedRange: {
+      start: params.start,
+      end: params.end,
+    },
+    allClasses: data?.map(c => ({
+      id: c.id,
+      title: c.title,
+      starts_at: c.starts_at,
+      category: c.category,
+      is_cancelled: c.is_cancelled,
+    })) ?? [],
   });
   
-  return filtered;
+  // Classes are already filtered by is_cancelled at DB level
+  // Return as-is (no additional JS filtering needed)
+  return data ?? [];
 }
 
 export async function GET(req: Request) {
@@ -92,7 +92,14 @@ export async function GET(req: Request) {
       classTypeId: Number.isFinite(classTypeId) ? classTypeId : null,
     });
 
-    return NextResponse.json({ data });
+    return NextResponse.json({ data }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'Surrogate-Control': 'no-store',
+      },
+    });
   } catch (err: any) {
     console.error('[API /api/classes] GET failed', err);
     return NextResponse.json(

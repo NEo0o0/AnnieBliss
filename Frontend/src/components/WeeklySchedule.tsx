@@ -34,6 +34,16 @@ export function WeeklySchedule({ onNavigate, initialClasses }: WeeklySchedulePro
       const end = new Date(currentWeekStart);
       end.setDate(end.getDate() + 6);
       end.setHours(23, 59, 59, 999);
+      
+      console.log('[WeeklySchedule] WEEK VIEW Date Range:', {
+        viewMode,
+        currentWeekStart: currentWeekStart.toISOString(),
+        startDate: start.toISOString(),
+        endDate: end.toISOString(),
+        startLocal: start.toLocaleString(),
+        endLocal: end.toLocaleString(),
+      });
+      
       return { startDate: start.toISOString(), endDate: end.toISOString() };
     } else if (viewMode === 'month') {
       // Month view: 1st to last day of the month
@@ -43,6 +53,15 @@ export function WeeklySchedule({ onNavigate, initialClasses }: WeeklySchedulePro
       start.setHours(0, 0, 0, 0);
       const end = new Date(year, month + 1, 0); // Last day of month
       end.setHours(23, 59, 59, 999);
+      
+      console.log('[WeeklySchedule] MONTH VIEW Date Range:', {
+        viewMode,
+        year,
+        month,
+        startDate: start.toISOString(),
+        endDate: end.toISOString(),
+      });
+      
       return { startDate: start.toISOString(), endDate: end.toISOString() };
     } else {
       // Day view: just the selected day
@@ -50,21 +69,36 @@ export function WeeklySchedule({ onNavigate, initialClasses }: WeeklySchedulePro
       start.setHours(0, 0, 0, 0);
       const end = new Date(selectedDate);
       end.setHours(23, 59, 59, 999);
+      
+      console.log('[WeeklySchedule] DAY VIEW Date Range:', {
+        viewMode,
+        selectedDate: selectedDate.toISOString(),
+        startDate: start.toISOString(),
+        endDate: end.toISOString(),
+      });
+      
       return { startDate: start.toISOString(), endDate: end.toISOString() };
     }
   }, [viewMode, selectedDate, currentWeekStart]);
 
   // Use the new useClasses hook with dynamic date filtering
+  // NOTE: Do NOT use initialClasses to avoid showing stale/deleted data
+  // Always fetch fresh data from API to ensure accuracy
   const { classes: dbClasses, loading, error, fetchClasses } = useClasses({
     startDate: dateRange.startDate,
     endDate: dateRange.endDate,
     category: 'class',
-    initialClasses,
+    initialClasses: undefined, // Force fresh fetch, ignore server-side initialClasses
     autoFetch: false, // We'll manually trigger fetches
   });
 
   // Fetch classes when date range changes (using stable string dependencies)
   useEffect(() => {
+    console.log('[WeeklySchedule] Fetching classes for date range:', {
+      startDate: dateRange.startDate,
+      endDate: dateRange.endDate,
+      viewMode,
+    });
     fetchClasses();
   }, [dateRange.startDate, dateRange.endDate]);
 
@@ -87,6 +121,18 @@ export function WeeklySchedule({ onNavigate, initialClasses }: WeeklySchedulePro
 
   // Transform database classes to UI format with null-safe handling
   const classes = useMemo(() => {
+    console.log('[WeeklySchedule] Transforming classes:', {
+      viewMode,
+      dbClassesCount: dbClasses.length,
+      dateRange,
+      firstClass: dbClasses[0] ? {
+        id: dbClasses[0].id,
+        title: dbClasses[0].title,
+        starts_at: dbClasses[0].starts_at,
+        is_cancelled: dbClasses[0].is_cancelled,
+      } : null,
+    });
+    
     return dbClasses.map((cls) => {
       // Priority: instructor_name (guest) > instructor.full_name (registered) > default
       const instructorName = (cls as any).instructor_name 

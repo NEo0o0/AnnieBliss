@@ -40,11 +40,19 @@ export function useClasses(options: UseClassesOptions = {}) {
       if (endDate) params.set('end', endDate);
       if (category) params.set('category', category);
       if (classTypeId != null) params.set('classTypeId', String(classTypeId));
+      
+      // Cache busting: Add timestamp to force fresh data on every request
+      params.set('t', String(new Date().getTime()));
 
       const url = `/api/classes?${params.toString()}`;
       console.log('[useClasses] Fetching classes from:', url);
 
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
       if (!response.ok) {
         const errorText = await response.text();
         console.error('[useClasses] Fetch failed:', {
