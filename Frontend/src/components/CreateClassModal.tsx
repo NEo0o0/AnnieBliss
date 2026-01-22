@@ -49,6 +49,8 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
     end_date: '',
     time: '',
     instructorId: '' as '' | string,
+    instructorName: '',
+    isGuestInstructor: false,
     level: 'All Levels',
     capacity: 20,
     duration: '60 min',
@@ -76,7 +78,7 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
       try {
         const { data, error } = await supabase
           .from('class_types')
-          .select('id, title, description, duration_minutes')
+          .select('id, title, description, duration_minutes, default_price')
           .order('title', { ascending: true });
         if (error) throw error;
         setClassTypes((data ?? []) as ClassTypeRow[]);
@@ -99,6 +101,8 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
       title: selectedClassType.title ?? prev.title,
       duration: formatDuration(selectedClassType.duration_minutes),
       description: selectedClassType.description ?? prev.description,
+      // Auto-fill price from class_type's default_price
+      price: selectedClassType.default_price ? String(selectedClassType.default_price) : prev.price,
     }));
   }, [selectedClassType]);
 
@@ -184,8 +188,13 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
       setSubmitError('End date is required for retreats and teacher training');
       return;
     }
-    if (!formData.instructorId) {
+    // Validate instructor: either ID (registered) or Name (guest)
+    if (!formData.isGuestInstructor && !formData.instructorId) {
       setSubmitError('Please select an instructor');
+      return;
+    }
+    if (formData.isGuestInstructor && !formData.instructorName.trim()) {
+      setSubmitError('Please enter the guest instructor name');
       return;
     }
 
@@ -217,7 +226,7 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
       const { data: authData } = await supabase.auth.getUser();
       const creatorId = authData?.user?.id ?? null;
 
-      const insertPayload: TablesInsert<'classes'> = {
+      const insertPayload: TablesInsert<'classes'> & { instructor_name?: string | null } = {
         title: formData.title,
         description: formData.description,
         long_description: formData.long_description || null,
@@ -229,7 +238,8 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
         ends_at: endsLocal.toISOString(),
         category: formData.category as any,
         location: formData.room,
-        instructor_id: formData.instructorId,
+        instructor_id: formData.isGuestInstructor ? null : (formData.instructorId || null),
+        instructor_name: formData.isGuestInstructor ? formData.instructorName.trim() : null,
         created_by: creatorId,
         price: formData.price ? Number(formData.price) : null,
         early_bird_price: formData.early_bird_price ? Number(formData.early_bird_price) : null,
@@ -251,7 +261,8 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
+    const { name, value, type } = e.target;
+    const checked = (e.target as HTMLInputElement).checked;
     
     // Handle category change - clear fields that don't apply to new category
     if (name === 'category') {
@@ -260,8 +271,7 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
         
         // Clear fields based on category
         if (value === 'Class') {
-          // Regular classes don't need price, early bird, or end date fields
-          newData.price = '';
+          // Regular classes don't need early bird or end date fields
           newData.early_bird_price = '';
           newData.early_bird_deadline = '';
           newData.registration_opens_at = '';
@@ -276,10 +286,18 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
         
         return newData;
       });
+    } else if (name === 'isGuestInstructor') {
+      // When toggling guest instructor, clear the opposite field
+      setFormData(prev => ({
+        ...prev,
+        isGuestInstructor: checked,
+        instructorId: checked ? '' : prev.instructorId,
+        instructorName: checked ? prev.instructorName : ''
+      }));
     } else {
       setFormData(prev => ({
         ...prev,
-        [name]: name === 'capacity' ? parseInt(value) : value
+        [name]: type === 'checkbox' ? checked : (name === 'capacity' ? parseInt(value) : value)
       }));
     }
   };
@@ -423,32 +441,67 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
             />
           </div>
 
+          {/* Guest Instructor Toggle */}
+          <div className="flex items-center gap-3 p-4 bg-[var(--color-cream)] rounded-lg">
+            <input
+              type="checkbox"
+              id="isGuestInstructor"
+              name="isGuestInstructor"
+              checked={formData.isGuestInstructor}
+              onChange={handleChange}
+              className="w-5 h-5 text-[var(--color-sage)] border-[var(--color-sand)] rounded focus:ring-2 focus:ring-[var(--color-sage)]"
+            />
+            <label htmlFor="isGuestInstructor" className="text-sm text-[var(--color-earth-dark)] cursor-pointer">
+              Guest / External Instructor (doesn't have an account)
+            </label>
+          </div>
+
           {/* Instructor and Level Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-[var(--color-stone)] mb-2">
                 Instructor *
               </label>
-              <select
-                name="instructorId"
-                value={formData.instructorId}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
-              >
-                <option value="">{instructorsLoading ? 'Loading…' : 'Select an instructor'}</option>
-                {instructors.map((p) => {
-                  const label = p.full_name ?? p.id;
-                  return (
-                    <option key={p.id} value={p.id}>
-                      {label}
-                    </option>
-                  );
-                })}
-              </select>
-              {instructorsError ? (
+              
+              {formData.isGuestInstructor ? (
+                <input
+                  type="text"
+                  name="instructorName"
+                  value={formData.instructorName}
+                  onChange={handleChange}
+                  required
+                  placeholder="Enter instructor name"
+                  className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
+                />
+              ) : (
+                <select
+                  name="instructorId"
+                  value={formData.instructorId}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
+                >
+                  <option value="">{instructorsLoading ? 'Loading…' : 'Select an instructor'}</option>
+                  {instructors.map((p) => {
+                    const label = p.full_name ?? p.id;
+                    return (
+                      <option key={p.id} value={p.id}>
+                        {label}
+                      </option>
+                    );
+                  })}
+                </select>
+              )}
+              
+              {instructorsError && !formData.isGuestInstructor ? (
                 <div className="mt-2 text-sm text-red-700">{instructorsError.message}</div>
               ) : null}
+              
+              {formData.isGuestInstructor && (
+                <p className="mt-1 text-xs text-[var(--color-stone)]">
+                  For instructors who don't have a user account
+                </p>
+              )}
             </div>
 
             <div>
@@ -530,8 +583,28 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
             </div>
           </div>
 
-          {/* Price - Show for Workshop, Retreat, Teacher Training */}
-          {formData.category !== 'Class' && (
+          {/* Price - Show for ALL categories */}
+          {formData.category === 'Class' ? (
+            <div>
+              <label className="block text-sm text-[var(--color-stone)] mb-2">
+                Price (฿) *
+              </label>
+              <input
+                type="number"
+                name="price"
+                value={formData.price}
+                onChange={handleChange}
+                required
+                min="0"
+                step="0.01"
+                placeholder="Auto-filled from class type"
+                className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
+              />
+              <p className="mt-1 text-xs text-[var(--color-stone)]">
+                Price is auto-filled from the selected class type. You can override it if needed.
+              </p>
+            </div>
+          ) : (
             <div>
               <label className="block text-sm text-[var(--color-stone)] mb-2">
                 Price (฿) *

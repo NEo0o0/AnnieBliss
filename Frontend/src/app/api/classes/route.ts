@@ -19,20 +19,60 @@ async function fetchClassesFromDb(params: {
 }) {
   const supabase = createSupabasePublicClient();
 
+  console.log('[fetchClassesFromDb] Query params:', {
+    start: params.start,
+    end: params.end,
+    category: params.category,
+    classTypeId: params.classTypeId
+  });
+
+  // Use LEFT JOIN for class_types so classes without valid class_type_id still appear
   let query = supabase
     .from('classes')
-    .select('*, class_types(*)')
-    .eq('is_cancelled', false)
+    .select('*, class_types!left(*)')
     .order('starts_at', { ascending: true });
 
+  // For date range, use < instead of <= for end to cover full 24 hours
   if (params.start) query = query.gte('starts_at', params.start);
-  if (params.end) query = query.lte('starts_at', params.end);
-  if (params.category) query = query.eq('category', params.category);
+  if (params.end) {
+    // Extend end date to cover the entire day (add 1 day and use < instead of <=)
+    const endDate = new Date(params.end);
+    endDate.setDate(endDate.getDate() + 1);
+    query = query.lt('starts_at', endDate.toISOString());
+  }
+  
+  // Case-insensitive category filter
+  if (params.category) {
+    query = query.ilike('category', params.category);
+  }
+  
   if (params.classTypeId != null) query = query.eq('class_type_id', params.classTypeId);
 
   const { data, error } = await query;
+  
+  console.log('[fetchClassesFromDb] Query result:', {
+    count: data?.length ?? 0,
+    error: error?.message,
+    firstClass: data?.[0] ? {
+      id: data[0].id,
+      title: data[0].title,
+      starts_at: data[0].starts_at,
+      category: data[0].category,
+      is_cancelled: data[0].is_cancelled
+    } : null
+  });
+  
   if (error) throw error;
-  return data ?? [];
+  
+  // Filter out cancelled classes in JS to ensure we see all data first
+  const filtered = data?.filter(c => !c.is_cancelled) ?? [];
+  
+  console.log('[fetchClassesFromDb] After filtering cancelled:', {
+    originalCount: data?.length ?? 0,
+    filteredCount: filtered.length
+  });
+  
+  return filtered;
 }
 
 export async function GET(req: Request) {

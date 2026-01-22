@@ -13,3 +13,5 @@ export { useTeacherTraining } from './useTeacherTraining';
 export { useRooms } from './useRooms';
 export { useReports } from './useReports';
 export { useAppSettings } from './useAppSettings';
+export { useSubscribers } from './useSubscribers';
+export { usePaymentConfig } from './usePaymentConfig';

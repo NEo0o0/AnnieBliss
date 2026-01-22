@@ -87,28 +87,35 @@ export function WeeklySchedule({ onNavigate, initialClasses }: WeeklySchedulePro
 
   // Transform database classes to UI format with null-safe handling
   const classes = useMemo(() => {
-    return dbClasses.map((cls) => ({
-      id: cls.id.toString(),
-      title: cls.title,
-      time: new Date(cls.starts_at).toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        hour12: true 
-      }),
-      instructor: (cls as any).instructor_name || 'Annie Bliss', // Use instructor_name from DB
-      level: cls.level || 'All Levels',
-      capacity: cls.capacity,
-      enrolled: cls.booked_count,
-      day: new Date(cls.starts_at).toLocaleDateString('en-US', { weekday: 'long' }),
-      duration: cls.ends_at 
-        ? `${Math.round((new Date(cls.ends_at).getTime() - new Date(cls.starts_at).getTime()) / 60000)} min`
-        : '60 min',
-      description: cls.description || 'A wonderful yoga class to enhance your practice.',
-      room: cls.location || 'Studio A',
-      category: cls.category || 'class',
-      // Store original DB class for detail modal
-      _dbClass: cls,
-    }));
+    return dbClasses.map((cls) => {
+      // Priority: instructor_name (guest) > instructor.full_name (registered) > default
+      const instructorName = (cls as any).instructor_name 
+        || (cls as any).instructor?.full_name 
+        || 'Annie Bliss Team';
+      
+      return {
+        id: cls.id.toString(),
+        title: cls.title,
+        time: new Date(cls.starts_at).toLocaleTimeString('en-US', { 
+          hour: 'numeric', 
+          minute: '2-digit',
+          hour12: true 
+        }),
+        instructor: instructorName,
+        level: cls.level || 'All Levels',
+        capacity: cls.capacity,
+        enrolled: cls.booked_count,
+        day: new Date(cls.starts_at).toLocaleDateString('en-US', { weekday: 'long' }),
+        duration: cls.ends_at 
+          ? `${Math.round((new Date(cls.ends_at).getTime() - new Date(cls.starts_at).getTime()) / 60000)} min`
+          : '60 min',
+        description: cls.description || 'A wonderful yoga class to enhance your practice.',
+        room: cls.location || 'Studio A',
+        category: cls.category || 'class',
+        // Store original DB class for detail modal
+        _dbClass: cls,
+      };
+    });
   }, [dbClasses]);
 
   // Helper function to get the start of the week (Monday)

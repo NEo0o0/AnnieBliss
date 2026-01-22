@@ -5,6 +5,7 @@ import { supabase } from '@/utils/supabase/client';
 import { toast } from 'sonner';
 import { Save, Loader2, Settings as SettingsIcon } from 'lucide-react';
 import { ImageUpload } from '../ImageUpload';
+import { PaymentMethodsConfig } from '../PaymentMethodsConfig';
 
 interface AppSetting {
   key: string;
@@ -239,6 +240,11 @@ export function SiteSettings() {
             </div>
           </div>
         ))}
+
+        {/* Payment Methods Configuration */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <PaymentMethodsConfig />
+        </div>
       </div>
 
       {/* Save Button */}

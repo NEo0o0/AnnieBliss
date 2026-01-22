@@ -62,10 +62,9 @@ export function ScheduleClient({ initialClasses }: ScheduleClientProps) {
       <WeeklySchedule onNavigate={onNavigate} initialClasses={initialClasses} />
       
       {/* Studio Guidelines */}
-      <div className="max-w-6xl mx-auto px-6 py-12 space-y-12">
         <ClassRules />
         <CancellationPolicy />
-      </div>
+      
       
       <ClassTypes onNavigate={onNavigate} />
     </>

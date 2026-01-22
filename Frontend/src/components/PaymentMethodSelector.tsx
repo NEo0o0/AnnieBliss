@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { CreditCard, Wallet, Banknote, QrCode, MessageCircle } from 'lucide-react';
 import { supabase } from '@/utils/supabase/client';
 import { PaymentSlipUpload } from './PaymentSlipUpload';
+import { usePaymentConfig } from '@/hooks';
+import type { ProductType } from '@/types/payment-config.types';
 
 interface PaymentMethodSelectorProps {
   hasActivePackage: boolean;
@@ -18,6 +20,7 @@ interface PaymentMethodSelectorProps {
   selectedMethod?: string;
   userId?: string;
   userFullName?: string;
+  productType?: ProductType; // NEW: Specify which product type config to use
 }
 
 interface PaymentSettings {
@@ -39,8 +42,16 @@ export function PaymentMethodSelector({
   onSelect,
   selectedMethod,
   userId,
-  userFullName
+  userFullName,
+  productType
 }: PaymentMethodSelectorProps) {
+  // Determine product type based on props if not explicitly provided
+  const inferredProductType: ProductType = productType || 
+    (isWorkshop ? 'workshop' : isBundle ? 'packages' : 'class_booking');
+  
+  const { getMethodsForProduct, shouldShowContactAdmin, loading: configLoading } = usePaymentConfig();
+  const paymentConfig = getMethodsForProduct(inferredProductType);
+  const showContactAdminOnly = shouldShowContactAdmin(inferredProductType);
   const [showTransferInfo, setShowTransferInfo] = useState(false);
   const [paymentNote, setPaymentNote] = useState('');
   const [paymentSlipUrl, setPaymentSlipUrl] = useState('');
@@ -160,6 +171,103 @@ export function PaymentMethodSelector({
     }
   };
 
+  // If config is loading, show loading state
+  if (configLoading) {
+    return (
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-[var(--color-earth-dark)]">
+          Loading payment options...
+        </h3>
+      </div>
+    );
+  }
+
+  // If contact admin only mode, show contact options
+  if (showContactAdminOnly) {
+    return (
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-[var(--color-earth-dark)]">
+          Contact Us to Book
+        </h3>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <p className="text-sm text-blue-800">
+            Please contact us via WhatsApp to complete your booking.
+          </p>
+        </div>
+        <button
+          onClick={handleManualPaymentClick}
+          className="w-full p-4 rounded-lg border-2 border-green-500 hover:border-green-600 bg-green-50 hover:bg-green-100 transition-all duration-300 text-left"
+        >
+          <div className="flex items-start gap-3">
+            <MessageCircle size={24} className="text-green-600 mt-1" />
+            <div className="flex-1">
+              <div className="font-semibold text-green-800">
+                Contact via WhatsApp | ติดต่อผ่าน WhatsApp
+              </div>
+              <div className="text-sm text-green-700 mt-1">
+                Chat with us to arrange booking
+              </div>
+            </div>
+          </div>
+        </button>
+        {showGuestForm && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+              <h3 className="text-xl font-bold text-[var(--color-earth-dark)] mb-4">
+                Guest Information | ข้อมูลผู้เข้าร่วม
+              </h3>
+              <p className="text-sm text-[var(--color-stone)] mb-4">
+                Please provide your details to contact us via WhatsApp
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-stone)] mb-2">
+                    Your Name | ชื่อของคุณ
+                  </label>
+                  <input
+                    type="text"
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    placeholder="Enter your name"
+                    className="w-full px-4 py-2 border-2 border-[var(--color-sand)] rounded-lg focus:border-[var(--color-sage)] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-stone)] mb-2">
+                    Phone Number | เบอร์โทรศัพท์
+                  </label>
+                  <input
+                    type="tel"
+                    value={guestPhone}
+                    onChange={(e) => setGuestPhone(e.target.value)}
+                    placeholder="Enter your phone number"
+                    className="w-full px-4 py-2 border-2 border-[var(--color-sand)] rounded-lg focus:border-[var(--color-sage)] focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowGuestForm(false)}
+                  className="flex-1 py-2 border-2 border-[var(--color-sand)] hover:border-[var(--color-sage)] text-[var(--color-earth-dark)] rounded-lg transition-colors"
+                >
+                  Cancel | ยกเลิก
+                </button>
+                <button
+                  onClick={handleWhatsAppRedirect}
+                  disabled={!guestName || !guestPhone}
+                  className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  <MessageCircle size={18} />
+                  Open WhatsApp
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-[var(--color-earth-dark)]">
@@ -197,100 +305,100 @@ export function PaymentMethodSelector({
       )}
 
       {/* Bank Transfer Option - Regular Classes & Bundles */}
-      {!isWorkshop && (
-        <>
-          <button
-            onClick={() => handleMethodSelect('bank_transfer')}
-            className={`w-full p-4 rounded-lg border-2 transition-all duration-300 text-left ${
-              selectedMethod === 'bank_transfer'
-                ? 'border-[var(--color-sage)] bg-[var(--color-sage)]/5'
-                : 'border-[var(--color-sand)] hover:border-[var(--color-sage)]/50'
-            }`}
-          >
-            <div className="flex items-start gap-3">
-              <Wallet size={24} className="text-[var(--color-clay)] mt-1" />
-              <div className="flex-1">
-                <div className="font-semibold text-[var(--color-earth-dark)]">
-                  Bank Transfer
-                </div>
-                <div className="text-sm text-[var(--color-stone)] mt-1">
-                  Transfer ฿{classPrice.toLocaleString()} before class
-                </div>
+      {!isWorkshop && paymentConfig.bank_transfer && (
+        <button
+          onClick={() => handleMethodSelect('bank_transfer')}
+          className={`w-full p-4 rounded-lg border-2 transition-all duration-300 text-left ${
+            selectedMethod === 'bank_transfer'
+              ? 'border-[var(--color-sage)] bg-[var(--color-sage)]/5'
+              : 'border-[var(--color-sand)] hover:border-[var(--color-sage)]/50'
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <Wallet size={24} className="text-[var(--color-clay)] mt-1" />
+            <div className="flex-1">
+              <div className="font-semibold text-[var(--color-earth-dark)]">
+                Bank Transfer
+              </div>
+              <div className="text-sm text-[var(--color-stone)] mt-1">
+                Transfer ฿{classPrice.toLocaleString()} before class
               </div>
             </div>
-          </button>
+          </div>
+        </button>
+      )}
 
-          <button
-            onClick={() => handleMethodSelect('promptpay')}
-            className={`w-full p-4 rounded-lg border-2 transition-all duration-300 text-left ${
-              selectedMethod === 'promptpay'
-                ? 'border-[var(--color-sage)] bg-[var(--color-sage)]/5'
-                : 'border-[var(--color-sand)] hover:border-[var(--color-sage)]/50'
-            }`}
-          >
-            <div className="flex items-start gap-3">
-              <QrCode size={24} className="text-[var(--color-clay)] mt-1" />
-              <div className="flex-1">
-                <div className="font-semibold text-[var(--color-earth-dark)]">
-                  PromptPay / QR Code
-                </div>
-                <div className="text-sm text-[var(--color-stone)] mt-1">
-                  Scan QR code to pay ฿{classPrice.toLocaleString()}
-                </div>
+      {!isWorkshop && paymentConfig.promptpay && (
+        <button
+          onClick={() => handleMethodSelect('promptpay')}
+          className={`w-full p-4 rounded-lg border-2 transition-all duration-300 text-left ${
+            selectedMethod === 'promptpay'
+              ? 'border-[var(--color-sage)] bg-[var(--color-sage)]/5'
+              : 'border-[var(--color-sand)] hover:border-[var(--color-sage)]/50'
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <QrCode size={24} className="text-[var(--color-clay)] mt-1" />
+            <div className="flex-1">
+              <div className="font-semibold text-[var(--color-earth-dark)]">
+                PromptPay / QR Code
+              </div>
+              <div className="text-sm text-[var(--color-stone)] mt-1">
+                Scan QR code to pay ฿{classPrice.toLocaleString()}
               </div>
             </div>
-          </button>
-        </>
+          </div>
+        </button>
       )}
 
       {/* Workshop Transfer Options */}
-      {isWorkshop && (
-        <>
-          <button
-            onClick={() => handleMethodSelect('bank_transfer')}
-            className={`w-full p-4 rounded-lg border-2 transition-all duration-300 text-left ${
-              selectedMethod === 'bank_transfer'
-                ? 'border-[var(--color-sage)] bg-[var(--color-sage)]/5'
-                : 'border-[var(--color-sand)] hover:border-[var(--color-sage)]/50'
-            }`}
-          >
-            <div className="flex items-start gap-3">
-              <Wallet size={24} className="text-[var(--color-clay)] mt-1" />
-              <div className="flex-1">
-                <div className="font-semibold text-[var(--color-earth-dark)]">
-                  Bank Transfer | โอนเงินผ่านธนาคาร
-                </div>
-                <div className="text-sm text-[var(--color-stone)] mt-1">
-                  Transfer ฿{classPrice.toLocaleString()} to confirm registration
-                </div>
+      {isWorkshop && paymentConfig.bank_transfer && (
+        <button
+          onClick={() => handleMethodSelect('bank_transfer')}
+          className={`w-full p-4 rounded-lg border-2 transition-all duration-300 text-left ${
+            selectedMethod === 'bank_transfer'
+              ? 'border-[var(--color-sage)] bg-[var(--color-sage)]/5'
+              : 'border-[var(--color-sand)] hover:border-[var(--color-sage)]/50'
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <Wallet size={24} className="text-[var(--color-clay)] mt-1" />
+            <div className="flex-1">
+              <div className="font-semibold text-[var(--color-earth-dark)]">
+                Bank Transfer | โอนเงินผ่านธนาคาร
+              </div>
+              <div className="text-sm text-[var(--color-stone)] mt-1">
+                Transfer ฿{classPrice.toLocaleString()} to confirm registration
               </div>
             </div>
-          </button>
-
-          <button
-            onClick={() => handleMethodSelect('promptpay')}
-            className={`w-full p-4 rounded-lg border-2 transition-all duration-300 text-left ${
-              selectedMethod === 'promptpay'
-                ? 'border-[var(--color-sage)] bg-[var(--color-sage)]/5'
-                : 'border-[var(--color-sand)] hover:border-[var(--color-sage)]/50'
-            }`}
-          >
-            <div className="flex items-start gap-3">
-              <QrCode size={24} className="text-[var(--color-clay)] mt-1" />
-              <div className="flex-1">
-                <div className="font-semibold text-[var(--color-earth-dark)]">
-                  PromptPay / QR Code | พร้อมเพย์
-                </div>
-                <div className="text-sm text-[var(--color-stone)] mt-1">
-                  Scan QR code to pay ฿{classPrice.toLocaleString()}
-                </div>
-              </div>
-            </div>
-          </button>
-        </>
+          </div>
+        </button>
       )}
 
-      {/* Cash Option - Regular Classes Only */}
+      {isWorkshop && paymentConfig.promptpay && (
+        <button
+          onClick={() => handleMethodSelect('promptpay')}
+          className={`w-full p-4 rounded-lg border-2 transition-all duration-300 text-left ${
+            selectedMethod === 'promptpay'
+              ? 'border-[var(--color-sage)] bg-[var(--color-sage)]/5'
+              : 'border-[var(--color-sand)] hover:border-[var(--color-sage)]/50'
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <QrCode size={24} className="text-[var(--color-clay)] mt-1" />
+            <div className="flex-1">
+              <div className="font-semibold text-[var(--color-earth-dark)]">
+                PromptPay / QR Code | พร้อมเพย์
+              </div>
+              <div className="text-sm text-[var(--color-stone)] mt-1">
+                Scan QR code to pay ฿{classPrice.toLocaleString()}
+              </div>
+            </div>
+          </div>
+        </button>
+      )}
+
+      {/* Cash Option - ALWAYS show for class bookings (ignore payment config) */}
       {!isWorkshop && !isBundle && (
         <button
           onClick={() => handleMethodSelect('cash')}
@@ -317,8 +425,8 @@ export function PaymentMethodSelector({
         </button>
       )}
 
-      {/* WhatsApp Contact - Workshops & Bundles */}
-      {(isWorkshop || isBundle) && (
+      {/* WhatsApp Contact - Workshops & Bundles (only if contact_admin is enabled or no other options) */}
+      {(isWorkshop || isBundle) && paymentConfig.contact_admin && (
         <button
           onClick={handleManualPaymentClick}
           className="w-full p-4 rounded-lg border-2 border-green-500 hover:border-green-600 bg-green-50 hover:bg-green-100 transition-all duration-300 text-left"

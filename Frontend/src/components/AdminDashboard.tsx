@@ -164,12 +164,12 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
       const { data: classesData, error: classesError } = await supabase
         .from('classes')
         .select(
-          'id, title, starts_at, ends_at, capacity, booked_count, location, instructor_id, class_types(title), instructor:profiles!classes_instructor_id_fkey(full_name)'
+          'id, title, starts_at, ends_at, capacity, booked_count, location, instructor_id, instructor_name, class_types!left(title), instructor:profiles!classes_instructor_id_fkey(full_name)'
         )
         .eq('is_cancelled', false)
-        .eq('category', 'class')
+        .ilike('category', 'class')
         .gte('starts_at', start.toISOString())
-        .lte('starts_at', end.toISOString())
+        .lt('starts_at', new Date(end.getTime() + 24 * 60 * 60 * 1000).toISOString())
         .order('starts_at', { ascending: true });
 
       if (classesError) {
@@ -190,13 +190,19 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
         const fmt = (d: Date) =>
           d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
         const time = endTime ? `${fmt(startTime)} - ${fmt(endTime)}` : fmt(startTime);
+        
+        // Priority: instructor_name (guest) > instructor.full_name (registered) > default
+        const instructorName = c.instructor_name 
+          || c.instructor?.full_name 
+          || 'Annie Bliss Team';
+        
         return {
           id: Number(c.id),
           name: c.title,
           time,
           booked: Number(c.booked_count ?? 0),
           capacity: Number(c.capacity ?? 0),
-          instructor: c.instructor?.full_name ?? '—',
+          instructor: instructorName,
           room: c.location ?? '',
         };
       });

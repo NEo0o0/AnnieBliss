@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { DollarSign, TrendingUp, TrendingDown, Wallet, Plus, X, Edit2, Trash2, Eye, CheckCircle, Clock, Download, Loader2 } from 'lucide-react';
 import { MonthYearPicker } from './MonthYearPicker';
 import { PaymentVerificationModal } from './PaymentVerificationModal';
+import { ManualTransactionModal } from './ManualTransactionModal';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { toast } from 'sonner';
 
@@ -82,6 +83,7 @@ export function PaymentsManagement() {
   const [activeTab, setActiveTab] = useState<'income' | 'expenses'>('income');
   const [incomeFilter, setIncomeFilter] = useState<'month' | 'all'>('month');
   const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [showManualTransactionModal, setShowManualTransactionModal] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [payments, setPayments] = useState<Payment[]>(mockPayments);
   const [expenses, setExpenses] = useState<Expense[]>(mockExpenses);
@@ -393,6 +395,17 @@ export function PaymentsManagement() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Add Manual Transaction Button */}
+            {activeTab === 'income' && (
+              <button
+                onClick={() => setShowManualTransactionModal(true)}
+                className="bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg"
+              >
+                <Plus size={18} />
+                <span className="text-sm">Add Transaction</span>
+              </button>
+            )}
+
             {/* Export CSV Button */}
             <button
               onClick={handleExportCSV}
@@ -736,6 +749,17 @@ export function PaymentsManagement() {
           </div>
         </div>
       )}
+
+      {/* Manual Transaction Modal */}
+      <ManualTransactionModal
+        isOpen={showManualTransactionModal}
+        onClose={() => setShowManualTransactionModal(false)}
+        onSuccess={() => {
+          // Refresh payments list - in production, this would refetch from database
+          setShowManualTransactionModal(false);
+          toast.success('Manual transaction added successfully');
+        }}
+      />
     </div>
   );
 }
