@@ -53,7 +53,7 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
     isGuestInstructor: false,
     level: 'Multilevel',
     capacity: 12,
-    duration: '60 min',
+    duration: '75',
     description: '',
     long_description: '',
     cover_image_url: '',
@@ -99,7 +99,7 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
     setFormData((prev) => ({
       ...prev,
       title: selectedClassType.title ?? prev.title,
-      duration: formatDuration(selectedClassType.duration_minutes),
+      duration: String(selectedClassType.duration_minutes ?? 75),
       description: selectedClassType.description ?? prev.description,
       // Auto-fill price from class_type's default_price
       price: selectedClassType.default_price ? String(selectedClassType.default_price) : prev.price,
@@ -204,7 +204,7 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
       return;
     }
 
-    const durationMinutes = selectedClassType?.duration_minutes ?? parseDurationToMinutes(formData.duration);
+    const durationMinutes = selectedClassType?.duration_minutes ?? (parseInt(formData.duration) || 75);
     
     // Calculate ends_at based on whether end_date is provided
     let endsLocal: Date;
@@ -343,34 +343,31 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
             </select>
           </div>
 
-          {/* Class Type */}
-          <div>
-            <label className="block text-sm text-[var(--color-stone)] mb-2">
-              Class Type {formData.category === 'Class' ? '*' : '(Optional)'}
-            </label>
-            <select
-              name="classTypeId"
-              value={formData.classTypeId}
-              onChange={handleChange}
-              required={formData.category === 'Class'}
-              className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
-            >
-              <option value="">{classTypesLoading ? 'Loading…' : 'Select a class type'}</option>
-              {classTypes.map((t) => (
-                <option key={t.id} value={String(t.id)}>
-                  {t.title}
-                </option>
-              ))}
-            </select>
-            {formData.category !== 'Class' && (
-              <p className="mt-1 text-xs text-[var(--color-stone)]">
-                Class type is optional for {formData.category === 'Workshop' ? 'workshops' : formData.category === 'Teacher Training' ? 'teacher trainings' : formData.category === 'Retreat' ? 'retreats' : 'special events'}
-              </p>
-            )}
-            {classTypesError ? (
-              <div className="mt-2 text-sm text-red-700">{classTypesError}</div>
-            ) : null}
-          </div>
+          {/* Class Type - Show only for Class category */}
+          {formData.category === 'Class' && (
+            <div>
+              <label className="block text-sm text-[var(--color-stone)] mb-2">
+                Class Type *
+              </label>
+              <select
+                name="classTypeId"
+                value={formData.classTypeId}
+                onChange={handleChange}
+                required
+                className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
+              >
+                <option value="">{classTypesLoading ? 'Loading…' : 'Select a class type'}</option>
+                {classTypes.map((t) => (
+                  <option key={t.id} value={String(t.id)}>
+                    {t.title}
+                  </option>
+                ))}
+              </select>
+              {classTypesError ? (
+                <div className="mt-2 text-sm text-red-700">{classTypesError}</div>
+              ) : null}
+            </div>
+          )}
 
           {/* Class Title */}
           <div>
@@ -527,20 +524,18 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm text-[var(--color-stone)] mb-2">
-                Duration *
+                Duration (minutes) *
               </label>
-              <select
+              <input
+                type="number"
                 name="duration"
                 value={formData.duration}
                 onChange={handleChange}
                 required
+                min="1"
+                placeholder="75"
                 className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
-              >
-                <option value="45 min">45 min</option>
-                <option value="60 min">60 min</option>
-                <option value="75 min">75 min</option>
-                <option value="90 min">90 min</option>
-              </select>
+              />
             </div>
 
             <div>
@@ -623,8 +618,8 @@ export function CreateClassModal({ onClose, onCreated }: CreateClassModalProps) 
             </div>
           )}
 
-          {/* Early Bird Fields - Show only for Retreat and Teacher Training */}
-          {(formData.category === 'Retreat' || formData.category === 'Teacher Training') && (
+          {/* Early Bird Fields - Show for all non-Class categories */}
+          {formData.category !== 'Class' && (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>

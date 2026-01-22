@@ -80,7 +80,10 @@ const formatEvent = (workshop: Workshop) => {
     price: formatPrice(workshop.price),
     location: workshop.location || 'TBA',
     excerpt: workshop.description || '',
-    category: workshop.category || 'Workshop'
+    category: workshop.category || 'Workshop',
+    gallery_images: workshop.gallery_images,
+    early_bird_price: workshop.early_bird_price,
+    early_bird_deadline: workshop.early_bird_deadline
   };
 };
 
@@ -277,9 +280,33 @@ export function WorkshopsEvents({ initialWorkshops }: { initialWorkshops?: Works
                   <div className="flex items-center justify-between pt-4 border-t border-[var(--color-sand)] mt-auto">
                     <div className="flex items-center gap-2">
                       <DollarSign size={18} className="text-[var(--color-clay)]" />
-                      <span className="text-xl text-[var(--color-earth-dark)]">
-                        {formatPrice(event.price)}
-                      </span>
+                      {(() => {
+                        const currentDate = new Date();
+                        const earlyBirdDeadline = event.early_bird_deadline ? new Date(event.early_bird_deadline) : null;
+                        const isEarlyBirdValid = earlyBirdDeadline && currentDate <= earlyBirdDeadline && event.early_bird_price;
+                        
+                        if (isEarlyBirdValid) {
+                          return (
+                            <div className="flex flex-col">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xl font-bold text-red-600">
+                                  {formatPrice(event.early_bird_price)}
+                                </span>
+                                <span className="px-2 py-0.5 bg-red-600 text-white text-[10px] font-semibold rounded-full">EARLY BIRD</span>
+                              </div>
+                              <span className="text-sm text-[var(--color-stone)] line-through">
+                                {formatPrice(event.price)}
+                              </span>
+                            </div>
+                          );
+                        }
+                        
+                        return (
+                          <span className="text-xl text-[var(--color-earth-dark)]">
+                            {formatPrice(event.price)}
+                          </span>
+                        );
+                      })()}
                     </div>
                     <button
                       className="bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white px-4 py-2 rounded-lg transition-all duration-300 flex items-center gap-2 text-sm group"

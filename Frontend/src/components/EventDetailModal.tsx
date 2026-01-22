@@ -20,6 +20,8 @@ interface EventDetailModalProps {
     excerpt: string;
     category: string;
     gallery_images?: string[] | null;
+    early_bird_price?: number | null;
+    early_bird_deadline?: string | null;
   };
   onClose: () => void;
   onNavigate: (page: string) => void;
@@ -44,6 +46,12 @@ export function EventDetailModal({ event, onClose, onNavigate }: EventDetailModa
   const isPastEvent = new Date(event.starts_at) < new Date();
   const hasGallery = event.gallery_images && event.gallery_images.length > 0;
   const workshopPrice = parseFloat(event.price.replace(/[^0-9.]/g, '')) || 0;
+  
+  // Early bird pricing logic
+  const currentDate = new Date();
+  const earlyBirdDeadline = event.early_bird_deadline ? new Date(event.early_bird_deadline) : null;
+  const isEarlyBirdValid = earlyBirdDeadline && currentDate <= earlyBirdDeadline && event.early_bird_price;
+  const displayPrice = isEarlyBirdValid ? event.early_bird_price : workshopPrice;
 
   const handleBookingClick = () => {
     if (!user) {
@@ -243,9 +251,22 @@ export function EventDetailModal({ event, onClose, onNavigate }: EventDetailModa
 
             <div className="flex items-center gap-3 p-4 bg-[var(--color-cream)] rounded-lg">
               <DollarSign className="text-[var(--color-sage)]" size={20} />
-              <div>
+              <div className="flex-1">
                 <p className="text-xs text-[var(--color-stone)]">Investment</p>
-                <p className="text-[var(--color-earth-dark)] text-xl">{event.price}</p>
+                {isEarlyBirdValid ? (
+                  <div className="flex items-center gap-2">
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl font-bold text-red-600">฿{event.early_bird_price?.toLocaleString()}</span>
+                        <span className="px-2 py-0.5 bg-red-600 text-white text-xs font-semibold rounded-full">EARLY BIRD</span>
+                      </div>
+                      <span className="text-sm text-[var(--color-stone)] line-through">฿{workshopPrice.toLocaleString()}</span>
+                      <span className="text-xs text-red-600 mt-1">Until {earlyBirdDeadline?.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[var(--color-earth-dark)] text-xl">{event.price}</p>
+                )}
               </div>
             </div>
           </div>

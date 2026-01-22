@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/utils/supabase/client';
+import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function LoginPage() {
@@ -34,7 +35,7 @@ export default function LoginPage() {
         console.error('[Login] signInWithPassword failed', signInError);
         const message = signInError.message || 'Failed to sign in. Please try again.';
         setError(message);
-        alert(message);
+        toast.error(message);
         return;
       }
 
@@ -42,7 +43,7 @@ export default function LoginPage() {
         const message = 'Login succeeded but no user was returned. Please try again.';
         console.error('[Login] Missing data.user after sign-in', data);
         setError(message);
-        alert(message);
+        toast.error(message);
         return;
       }
 
@@ -51,7 +52,7 @@ export default function LoginPage() {
       console.error('[Login] Unexpected error during sign-in', err);
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
-      alert(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }

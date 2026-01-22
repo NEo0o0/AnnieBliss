@@ -425,7 +425,7 @@ export function ScheduleGeneratorTab() {
       });
     }
 
-    alert(`Successfully generated ${classesCreated} class sessions for ${getMonthName(month)} ${year}!`);
+    toast.success(`Successfully generated ${classesCreated} class sessions!`);
   };
 
   const getDayName = (date: Date) => {

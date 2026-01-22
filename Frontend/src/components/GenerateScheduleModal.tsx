@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, Calendar, Zap } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface GenerateScheduleModalProps {
   isOpen: boolean;
@@ -28,7 +29,7 @@ export function GenerateScheduleModal({ isOpen, onClose, onGenerate }: GenerateS
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (new Date(startDate) > new Date(endDate)) {
-      alert('Start date must be before end date');
+      toast.error('Start date must be before end date');
       return;
     }
     onGenerate(startDate, endDate);
