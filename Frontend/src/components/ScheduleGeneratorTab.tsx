@@ -483,6 +483,24 @@ export function ScheduleGeneratorTab() {
     return classTypes.find(ct => String(ct.id) === classTypeId)?.color_code || '#8CA899';
   };
 
+  const getClassTypeLevel = (classTypeId: string) => {
+    return classTypes.find(ct => String(ct.id) === classTypeId)?.level || 'Multilevel';
+  };
+
+  const getLevelBadgeColor = (level: string) => {
+    switch (level) {
+      case 'Basic Level':
+        return 'bg-green-100 text-green-700';
+      case 'Intermediate Level':
+        return 'bg-blue-100 text-blue-700';
+      case 'Advanced Level':
+        return 'bg-purple-100 text-purple-700';
+      case 'Multilevel':
+      default:
+        return 'bg-gray-100 text-gray-700';
+    }
+  };
+
   const getInstructorName = (instructorId: string) => {
     return instructors.find(i => i.id === instructorId)?.name || 'Unknown';
   };
@@ -567,19 +585,25 @@ export function ScheduleGeneratorTab() {
                           >
                             <button
                               onClick={() => handleDeleteSlot(slot.id, getClassTypeName(slot.classTypeId))}
-                              className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center"
+                              className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 hover:bg-red-600 text-white rounded-full opacity-70 hover:opacity-100 transition-all duration-200 flex items-center justify-center shadow-md z-10"
+                              title="Delete slot"
                             >
-                              <Trash2 size={12} />
+                              <Trash2 size={14} />
                             </button>
                             <div className="flex items-center gap-1 mb-1">
                               <Clock size={10} />
                               <span className="text-[var(--color-earth-dark)]">{slot.time}</span>
                             </div>
                             <div
-                              className="mb-1 truncate text-[var(--color-earth-dark)]"
+                              className="mb-1 truncate text-[var(--color-earth-dark)] font-medium"
                               title={getClassTypeName(slot.classTypeId)}
                             >
                               {getClassTypeName(slot.classTypeId)}
+                            </div>
+                            <div className="mb-1">
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium ${getLevelBadgeColor(getClassTypeLevel(slot.classTypeId))}`}>
+                                {getClassTypeLevel(slot.classTypeId)}
+                              </span>
                             </div>
                             <div className="text-[var(--color-stone)] text-xs truncate">
                               {getInstructorName(slot.instructorId)}

@@ -549,7 +549,8 @@ export function LoginRegister({ onLoginSuccess, onNavigateHome }: LoginRegisterP
 
                 {verificationSent ? (
                   <div className="bg-green-50 text-green-600 px-4 py-3 rounded-lg text-sm">
-                    ✓ Account created successfully! Logging you in...
+                    <div className="font-semibold mb-1">✓ Account created successfully!</div>
+                    <div>Please check your email to confirm your account.</div>
                   </div>
                 ) : (
                   <button

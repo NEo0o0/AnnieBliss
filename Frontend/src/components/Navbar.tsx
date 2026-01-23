@@ -90,6 +90,13 @@ export function Navbar({
   };
 
   const handleLogout = async () => {
+    // Show confirmation dialog
+    const confirmed = window.confirm('Are you sure you want to log out?');
+    
+    if (!confirmed) {
+      return; // User cancelled
+    }
+    
     try {
       await supabase.auth.signOut();
     } finally {

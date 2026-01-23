@@ -99,7 +99,30 @@ async function initAuthOnce() {
   }
 
   const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'SIGNED_OUT' || !session?.user) {
+    console.log('[Auth] Event:', event, 'Session:', !!session);
+
+    // Handle SIGNED_OUT - Clear state and force redirect for cross-tab sync
+    if (event === 'SIGNED_OUT') {
+      console.log('[Auth] User signed out - clearing state and redirecting');
+      emitAuthState({
+        user: null,
+        profile: null,
+        session: null,
+        loading: false,
+        error: null,
+      });
+      // Clear any cached data
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('user-profile');
+        // Force redirect to home page to clear stale app state
+        window.location.href = '/';
+      }
+      return;
+    }
+
+    // Handle no session (shouldn't happen with proper events, but safety check)
+    if (!session?.user) {
+      console.log('[Auth] No session/user - clearing state');
       emitAuthState({
         user: null,
         profile: null,
@@ -110,15 +133,40 @@ async function initAuthOnce() {
       return;
     }
 
-    // Stale-while-revalidate: Keep existing profile visible during refresh
-    // Only show loading if we don't have a profile yet
+    // Handle SIGNED_IN and TOKEN_REFRESHED - Update session and refetch profile
+    if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      console.log('[Auth] Signed in or token refreshed - updating session and fetching profile');
+      
+      // Immediately update session and user
+      emitAuthState({
+        ...cachedAuthState,
+        user: session.user,
+        session,
+        loading: true, // Show loading while fetching fresh profile
+        error: null,
+      });
+
+      // Fetch fresh profile data
+      const profile = await fetchProfile(session.user.id);
+      emitAuthState({
+        user: session.user,
+        profile,
+        session,
+        loading: false,
+        error: null,
+      });
+      return;
+    }
+
+    // Handle other events (INITIAL_SESSION, USER_UPDATED, etc.)
+    console.log('[Auth] Other event - updating state');
     const hasProfile = cachedAuthState.profile !== null;
     
     emitAuthState({
       ...cachedAuthState,
       user: session.user,
       session,
-      loading: !hasProfile, // Only show loading if no profile exists
+      loading: !hasProfile,
       error: null,
     });
 

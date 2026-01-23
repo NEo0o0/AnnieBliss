@@ -133,11 +133,15 @@ export function GalleryManagementModal({
             </div>
           )}
 
-          <MultiImageUpload
-            images={galleryImages}
-            onImagesChange={setGalleryImages}
-            maxImages={20}
-          />
+          {/* Upload Area Only - Images are displayed in grid above */}
+          <div>
+            <h4 className="text-sm font-medium text-[var(--color-earth-dark)] mb-3">Add More Images</h4>
+            <MultiImageUpload
+              images={[]} 
+              onImagesChange={(newImages) => setGalleryImages([...galleryImages, ...newImages])}
+              maxImages={20 - galleryImages.length}
+            />
+          </div>
 
           <div className="mt-6 p-4 bg-[var(--color-sage)]/5 border border-[var(--color-sage)]/20 rounded-lg">
             <p className="text-sm text-[var(--color-stone)]">
