@@ -172,7 +172,7 @@ export function AdminDashboard({ onNavigateHome, onLogout }: AdminDashboardProps
         .eq('is_cancelled', false)
         .ilike('category', 'class')
         .gte('starts_at', start.toISOString())
-        .lt('starts_at', new Date(end.getTime() + 24 * 60 * 60 * 1000).toISOString())
+        .lte('starts_at', end.toISOString())
         .order('starts_at', { ascending: true });
 
       if (classesError) {

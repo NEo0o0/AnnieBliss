@@ -1,9 +1,10 @@
  "use client";
 
-import { X, Clock, Calendar, MapPin, DollarSign, Users, Tag, UserPlus, Camera, Loader2 } from 'lucide-react';
+import { X, Calendar, MapPin, DollarSign, Users, Clock, UserPlus, Camera, Loader2, AlertCircle, Tag } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useBookings } from '../hooks/useBookings';
+import { useBookingCutoff } from '../hooks/useBookingCutoff';
 import { ImageCarousel } from './ImageCarousel';
 import { PaymentMethodSelector } from './PaymentMethodSelector';
 
@@ -31,6 +32,7 @@ interface EventDetailModalProps {
 export function EventDetailModal({ event, onClose, onNavigate }: EventDetailModalProps) {
   const { user, profile } = useAuth();
   const { createBooking } = useBookings({ autoFetch: false });
+  const { isCutoffPassed, cutoffMinutes, loading: cutoffLoading } = useBookingCutoff(event.starts_at);
   const [showPaymentSelector, setShowPaymentSelector] = useState(false);
   const [showManualBooking, setShowManualBooking] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
@@ -504,6 +506,19 @@ export function EventDetailModal({ event, onClose, onNavigate }: EventDetailModa
             </div>
           )}
 
+          {/* Booking Cutoff Warning */}
+          {isCutoffPassed && !cutoffLoading && !isPastEvent && (
+            <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-3">
+              <AlertCircle size={20} className="text-yellow-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-yellow-800">Online booking is closed for this session</p>
+                <p className="text-sm text-yellow-700 mt-1">
+                  This event starts in less than {Math.floor(cutoffMinutes / 60)} hours. Please contact us directly via WhatsApp to register.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Booking Section */}
           <div className="border-t border-[var(--color-sand)] pt-6">
             {isPastEvent ? (
@@ -517,22 +532,41 @@ export function EventDetailModal({ event, onClose, onNavigate }: EventDetailModa
             ) : (
               <div className="space-y-3">
                 {user && !showPaymentSelector && !showManualBooking ? (
-                  <button
-                    onClick={handleBookingClick}
-                    disabled={bookingLoading || bookingSuccess}
-                    className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white py-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105"
-                  >
-                    <Users size={20} />
-                    <span className="text-lg">Register for Workshop</span>
-                  </button>
+                  <>
+                    {/* Show register button only if cutoff hasn't passed */}
+                    {!isCutoffPassed && (
+                      <button
+                        onClick={handleBookingClick}
+                        disabled={bookingLoading || bookingSuccess}
+                        className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white py-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105"
+                      >
+                        <Users size={20} />
+                        <span className="text-lg">Register for Workshop</span>
+                      </button>
+                    )}
+                    {/* WhatsApp button - always visible */}
+                    <a
+                      href={`https://wa.me/66649249666?text=Hi, I would like to register for: ${encodeURIComponent(event.title)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-4 border-2 border-[var(--color-sage)] text-[var(--color-sage)] rounded-lg font-medium transition-all duration-300 hover:bg-[var(--color-sage)]/10 flex items-center justify-center gap-2"
+                    >
+                      <span>📱</span>
+                      <span>Manual Book via WhatsApp</span>
+                    </a>
+                  </>
                 ) : !user && !showPaymentSelector && !showManualBooking ? (
                   <>
-                    <button
-                      onClick={handleLoginRedirect}
-                      className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white py-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105"
-                    >
-                      <span className="text-lg">Login to Register</span>
-                    </button>
+                    {/* Show login button only if cutoff hasn't passed */}
+                    {!isCutoffPassed && (
+                      <button
+                        onClick={handleLoginRedirect}
+                        className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white py-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105"
+                      >
+                        <span className="text-lg">Login to Register</span>
+                      </button>
+                    )}
+                    {/* WhatsApp button - always visible */}
                     <a
                       href={`https://wa.me/66649249666?text=Hi, I would like to register for: ${encodeURIComponent(event.title)}`}
                       target="_blank"

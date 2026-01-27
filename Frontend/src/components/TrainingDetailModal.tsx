@@ -1,10 +1,11 @@
 'use client';
 
-import { X, Calendar, Clock, MapPin, DollarSign, BookOpen, Check, Users, Bell, UserPlus, Camera, Loader2 } from 'lucide-react';
+import { X, Calendar, Clock, MapPin, DollarSign, BookOpen, Check, Users, Bell, UserPlus, Camera, Loader2, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useBookings } from '../hooks/useBookings';
+import { useBookingCutoff } from '../hooks/useBookingCutoff';
 import { PaymentMethodSelector } from './PaymentMethodSelector';
 import type { Tables } from '../types/database.types';
 
@@ -23,12 +24,12 @@ export function TrainingDetailModal({ training, onClose }: TrainingDetailModalPr
   const router = useRouter();
   const { user, profile } = useAuth();
   const { createBooking } = useBookings({ autoFetch: false });
+  const { isCutoffPassed, cutoffMinutes, loading: cutoffLoading } = useBookingCutoff(training.starts_at);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [paymentOption, setPaymentOption] = useState<'full' | 'plan'>('full');
   const [showPaymentSelector, setShowPaymentSelector] = useState(false);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
   const [showManualBooking, setShowManualBooking] = useState(false);
   const [guestName, setGuestName] = useState('');
   const [guestContact, setGuestContact] = useState('');
@@ -654,50 +655,95 @@ export function TrainingDetailModal({ training, onClose }: TrainingDetailModalPr
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    <button
-                      onClick={handleBooking}
-                      disabled={bookingLoading || bookingSuccess}
-                      className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white py-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105"
-                    >
-                      <Users size={20} />
-                      <span className="text-lg">
-                        {bookingLoading
-                          ? 'Submitting...'
-                          : bookingSuccess
-                            ? 'Submitted!'
-                            : `Apply / Book Now (${formatMoney(amountDueToday)} due today)`}
-                      </span>
-                    </button>
-                    {isAdmin && (
-                      <button
-                        onClick={() => setShowManualBooking(true)}
-                        className="w-full py-3 border-2 border-[var(--color-sage)] text-[var(--color-sage)] hover:bg-[var(--color-sage)] hover:text-white rounded-lg transition-all duration-300 flex items-center justify-center gap-2"
-                      >
-                        <UserPlus size={20} />
-                        <span>Manual Register (Guest)</span>
-                      </button>
+                  <>
+                    {/* Booking Cutoff Warning */}
+                    {isCutoffPassed && !cutoffLoading && (
+                      <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-3">
+                        <AlertCircle size={20} className="text-yellow-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-semibold text-yellow-800">Online booking is closed for this session</p>
+                          <p className="text-sm text-yellow-700 mt-1">
+                            This training starts in less than {Math.floor(cutoffMinutes / 60)} hours. Please contact us directly via WhatsApp to register.
+                          </p>
+                        </div>
+                      </div>
                     )}
-                  </div>
+                    <div className="space-y-3">
+                      {/* Show booking button only if cutoff hasn't passed */}
+                      {!isCutoffPassed && (
+                        <button
+                          onClick={handleBooking}
+                          disabled={bookingLoading || bookingSuccess}
+                          className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white py-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105"
+                        >
+                          <Users size={20} />
+                          <span className="text-lg">
+                            {bookingLoading
+                              ? 'Submitting...'
+                              : bookingSuccess
+                                ? 'Submitted!'
+                                : `Apply / Book Now (${formatMoney(amountDueToday)} due today)`}
+                          </span>
+                        </button>
+                      )}
+                      {/* WhatsApp button - always visible */}
+                      <a
+                        href={`https://wa.me/66649249666?text=Hi, I would like to apply for: ${encodeURIComponent(training.title)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-4 border-2 border-[var(--color-sage)] text-[var(--color-sage)] rounded-lg font-medium transition-all duration-300 hover:bg-[var(--color-sage)]/10 flex items-center justify-center gap-2"
+                      >
+                        <span>📱</span>
+                        <span>Manual Book via WhatsApp</span>
+                      </a>
+                      {isAdmin && (
+                        <button
+                          onClick={() => setShowManualBooking(true)}
+                          className="w-full py-3 border-2 border-[var(--color-sage)] text-[var(--color-sage)] hover:bg-[var(--color-sage)] hover:text-white rounded-lg transition-all duration-300 flex items-center justify-center gap-2"
+                        >
+                          <UserPlus size={20} />
+                          <span>Manual Register (Guest)</span>
+                        </button>
+                      )}
+                    </div>
+                  </>
                 )
               ) : (
-                <div className="space-y-3">
-                  <button
-                    onClick={handleLoginRedirect}
-                    className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white py-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105"
-                  >
-                    <span className="text-lg">Login to Apply</span>
-                  </button>
-                  <a
-                    href={`https://wa.me/66649249666?text=Hi, I would like to apply for: ${encodeURIComponent(training.title)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full py-4 border-2 border-[var(--color-sage)] text-[var(--color-sage)] rounded-lg font-medium transition-all duration-300 hover:bg-[var(--color-sage)]/10 flex items-center justify-center gap-2"
-                  >
-                    <span>📱</span>
-                    <span>Manual Book via WhatsApp</span>
-                  </a>
-                </div>
+                <>
+                  {/* Booking Cutoff Warning */}
+                  {isCutoffPassed && !cutoffLoading && (
+                    <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-3">
+                      <AlertCircle size={20} className="text-yellow-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-semibold text-yellow-800">Online booking is closed for this session</p>
+                        <p className="text-sm text-yellow-700 mt-1">
+                          This training starts in less than {Math.floor(cutoffMinutes / 60)} hours. Please contact us directly via WhatsApp to register.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-3">
+                    {/* Show login button only if cutoff hasn't passed */}
+                    {!isCutoffPassed && (
+                      <button
+                        onClick={handleLoginRedirect}
+                        className="w-full bg-[var(--color-sage)] hover:bg-[var(--color-clay)] text-white py-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105"
+                      >
+                        <span className="text-lg">Login to Apply</span>
+                      </button>
+                    )}
+                    {/* WhatsApp button - always visible */}
+                    <a
+                      href={`https://wa.me/66649249666?text=Hi, I would like to apply for: ${encodeURIComponent(training.title)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-4 border-2 border-[var(--color-sage)] text-[var(--color-sage)] rounded-lg font-medium transition-all duration-300 hover:bg-[var(--color-sage)]/10 flex items-center justify-center gap-2"
+                    >
+                      <span>📱</span>
+                      <span>Manual Book via WhatsApp</span>
+                    </a>
+                  </div>
+                </>
               )
             ) : (
               // Coming Soon - Show Notify Me button

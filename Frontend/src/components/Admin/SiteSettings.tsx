@@ -46,6 +46,7 @@ const SETTINGS_CONFIG: SettingConfig[] = [
 
 export function SiteSettings() {
   const [settings, setSettings] = useState<Record<string, string>>({});
+  const [bookingCutoff, setBookingCutoff] = useState<string>('180');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +69,11 @@ export function SiteSettings() {
       const settingsMap: Record<string, string> = {};
       (data || []).forEach((setting) => {
         settingsMap[setting.key] = setting.value;
+        
+        // Handle booking_cutoff_minutes separately
+        if (setting.key === 'booking_cutoff_minutes') {
+          setBookingCutoff(setting.value);
+        }
       });
 
       setSettings(settingsMap);
@@ -99,6 +105,20 @@ export function SiteSettings() {
 
         if (upsertError) throw upsertError;
       }
+
+      // Update booking cutoff separately
+      const { error: bookingError } = await supabase
+        .from('app_settings')
+        .upsert({
+          key: 'booking_cutoff_minutes',
+          value: bookingCutoff,
+          label: 'Booking Cutoff Time (Minutes)',
+          type: 'number',
+          category: 'General',
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'key' });
+
+      if (bookingError) throw bookingError;
 
       toast.success('Settings saved successfully!');
       await fetchSettings();
@@ -244,6 +264,38 @@ export function SiteSettings() {
         {/* Payment Methods Configuration */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <PaymentMethodsConfig />
+        </div>
+
+        {/* Booking Settings */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-medium text-[var(--color-earth-dark)] mb-6 pb-3 border-b border-[var(--color-sand)]">
+            Booking Settings
+          </h3>
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-stone)] mb-2">
+                Booking Cutoff Time (Minutes)
+              </label>
+              <input
+                type="number"
+                value={bookingCutoff}
+                onChange={(e) => setBookingCutoff(e.target.value)}
+                min="0"
+                step="15"
+                placeholder="180"
+                className="w-full px-4 py-3 border border-[var(--color-sand)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-sage)] transition-all duration-300"
+              />
+              <p className="mt-2 text-sm text-[var(--color-stone)]">
+                Time before class starts to disable online booking (e.g., 60 = 1 hour). Set to 0 to disable.
+              </p>
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>Current setting:</strong> {bookingCutoff} minutes 
+                  ({Math.floor(parseInt(bookingCutoff) / 60)} hours {parseInt(bookingCutoff) % 60} minutes)
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
