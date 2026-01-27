@@ -30,6 +30,7 @@ export function TrainingDetailModal({ training, onClose }: TrainingDetailModalPr
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [paymentOption, setPaymentOption] = useState<'full' | 'plan'>('full');
   const [showPaymentSelector, setShowPaymentSelector] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
   const [showManualBooking, setShowManualBooking] = useState(false);
   const [guestName, setGuestName] = useState('');
   const [guestContact, setGuestContact] = useState('');
